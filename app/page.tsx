@@ -214,7 +214,7 @@ function HeroScene() {
       mount.removeChild(renderer.domElement);
     };
   }, []);
-
+//comment is added
   return (
     <div className="relative h-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-sky-100/80 md:h-[430px]">
       <div ref={mountRef} className="absolute inset-0" />
