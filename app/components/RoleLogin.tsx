@@ -24,16 +24,16 @@ type RoleLoginProps = {
 
 const accentStyles = {
   teal: {
-    button: "bg-teal-600 hover:bg-teal-700",
-    icon: "bg-teal-50 text-teal-700",
-    ring: "ring-teal-100",
-    text: "text-teal-700",
+    button: "bg-[#1e5b43] hover:bg-[#174633]",
+    icon: "bg-[#e8f3e6] text-[#1e5b43]",
+    ring: "ring-[#d9e9da]",
+    text: "text-[#1e5b43]",
   },
   sky: {
-    button: "bg-sky-600 hover:bg-sky-700",
-    icon: "bg-sky-50 text-sky-700",
-    ring: "ring-sky-100",
-    text: "text-sky-700",
+    button: "bg-[#1e5b43] hover:bg-[#174633]",
+    icon: "bg-[#e8f3e6] text-[#1e5b43]",
+    ring: "ring-[#d9e9da]",
+    text: "text-[#1e5b43]",
   },
 };
 
@@ -48,17 +48,17 @@ export default function RoleLogin({
   const styles = accentStyles[accent];
 
   return (
-    <main className="min-h-screen bg-[#f7fbff] text-slate-900">
+    <main className="min-h-screen bg-[#f7faf5] text-slate-900">
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
           animate={{ y: [0, -18, 0], rotate: [0, 2, 0] }}
           transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-8 top-24 h-40 w-40 rounded-full bg-sky-100/70 blur-2xl"
+          className="absolute left-8 top-24 h-40 w-40 rounded-full bg-[#dcefd9]/80 blur-2xl"
         />
         <motion.div
           animate={{ y: [0, 22, 0], rotate: [0, -3, 0] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-20 right-10 h-48 w-48 rounded-full bg-teal-100/80 blur-2xl"
+          className="absolute bottom-20 right-10 h-48 w-48 rounded-full bg-[#d5e9bc]/80 blur-2xl"
         />
       </div>
 
@@ -70,7 +70,7 @@ export default function RoleLogin({
         >
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-sky-700"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-[#1e5b43]"
           >
             <ArrowLeft size={17} />
             Back to home
@@ -110,7 +110,7 @@ export default function RoleLogin({
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.08 }}
-          className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-sky-100/70 ring-8 ${styles.ring} sm:p-8`}
+          className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-[#d9e9da]/70 ring-8 ${styles.ring} sm:p-8`}
         >
           <div className="flex items-center gap-3">
             <span className={`flex h-12 w-12 items-center justify-center rounded-xl ${styles.icon}`}>
@@ -131,7 +131,7 @@ export default function RoleLogin({
               <span className="text-sm font-semibold text-slate-700">
                 Email address
               </span>
-              <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-[#f8fbff] px-4 py-3 focus-within:border-sky-300">
+              <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-[#f7faf5] px-4 py-3 focus-within:border-[#8eb697]">
                 <Mail size={18} className="text-slate-400" />
                 <input
                   className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
@@ -149,7 +149,7 @@ export default function RoleLogin({
               <span className="text-sm font-semibold text-slate-700">
                 Password
               </span>
-              <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-[#f8fbff] px-4 py-3 focus-within:border-sky-300">
+              <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-[#f7faf5] px-4 py-3 focus-within:border-[#8eb697]">
                 <KeyRound size={18} className="text-slate-400" />
                 <input
                   className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
@@ -163,7 +163,7 @@ export default function RoleLogin({
               <label className="flex items-center gap-2 font-medium text-slate-600">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-sky-600"
+                  className="h-4 w-4 rounded border-slate-300 text-[#1e5b43]"
                 />
                 Remember me
               </label>
@@ -172,16 +172,16 @@ export default function RoleLogin({
               </a>
             </div>
 
-            <button
-              type="button"
+            <Link
+              href={role === "Admin" ? "/admin" : "/super-admin"}
               className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition ${styles.button}`}
             >
               Continue to Dashboard
               <LockKeyhole size={17} />
-            </button>
+            </Link>
           </form>
 
-          <div className="mt-6 rounded-xl border border-slate-200 bg-[#f8fbff] p-4">
+          <div className="mt-6 rounded-xl border border-slate-200 bg-[#f7faf5] p-4">
             <div className="flex gap-3">
               <BookOpen className={styles.text} size={20} />
               <p className="text-sm leading-6 text-slate-600">
