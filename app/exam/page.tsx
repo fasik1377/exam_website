@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCircle2, ChevronDown, CreditCard, Lock, MessageCircle, Send, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 const questions = [
   {
@@ -30,6 +30,14 @@ const questions = [
 ];
 
 export default function ExamPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f7faf5]" />}>
+      <ExamPageContent />
+    </Suspense>
+  );
+}
+
+function ExamPageContent() {
   const params = useSearchParams();
   const subject = params.get("subject") || "Mathematics";
   const grade = params.get("grade") || "Grade 12";
