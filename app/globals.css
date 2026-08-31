@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7fbff;
-  --foreground: #0f172a;
+  --background: #f7f9fc;
+  --foreground: #0B1F3A;
+  --brand-deep-blue: #0B1F3A;
+  --brand-gold: #F4B740;
+  --brand-royal-blue: #155EEF;
 }
 
 @theme inline {
@@ -29,6 +32,31 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Brand palette bridge for existing utility classes across all product surfaces. */
+[class*="bg-[#1e5b43]"], [class*="bg-[#173e2d]"] { background-color: #0B1F3A !important; }
+[class*="hover:bg-[#174633]"]:hover { background-color: #155EEF !important; }
+[class*="text-[#1e5b43]"], [class*="text-[#173e2d]"], [class*="text-[#21633e]"], [class*="text-[#287046]"], [class*="text-[#2e7850]"], [class*="text-[#4d8c5e]"], [class*="text-[#4d9b62]"] { color: #0B1F3A !important; }
+[class*="bg-[#d5e9bc]"], [class*="bg-[#f8d995]"] { background-color: #F4B740 !important; }
+[class*="text-[#d5e9bc]"], [class*="text-[#b8dbba]"] { color: #F4B740 !important; }
+[class*="bg-[#e8f3e6]"], [class*="bg-[#e5f2e4]"], [class*="bg-[#eaf5e9]"], [class*="bg-[#eef7eb]"], [class*="bg-[#eef6ec]"], [class*="bg-[#f3f7f1]"], [class*="bg-[#f7faf5]"], [class*="bg-[#fbfcf8]"], [class*="bg-[#e9f2e9]"] { background-color: #f7f9fc !important; }
+[class*="border-[#1e5b43]"], [class*="border-[#2e7850]"], [class*="border-[#4d9b62]"], [class*="border-[#b9d6bd]"], [class*="border-[#8eb697]"], [class*="border-[#bad3be]"], [class*="border-[#dfe9dc]"], [class*="border-[#e1e8df]"] { border-color: #d5dce8 !important; }
+[class*="bg-[#4d9b62]"] { background-color: #155EEF !important; }
+[class*="text-[#526258]"], [class*="text-[#466252]"], [class*="text-[#68766d]"], [class*="text-[#718277]"], [class*="text-[#668071]"], [class*="text-[#c7dbca]"] { color: #40516b !important; }
+
+/* Keep the brand lockup consistent wherever the site identity appears. */
+header img[alt*="NET"] { width: 3.5rem; height: 3.5rem; }
+footer > div:first-child > div:first-child > div:first-child { position: relative; min-height: 3.5rem; }
+footer > div:first-child > div:first-child > div:first-child > span,
+footer > div:first-child > div:first-child > div:first-child > div { visibility: hidden; }
+footer > div:first-child > div:first-child > div:first-child::before {
+  content: ""; display: block; width: 3.5rem; height: 3.5rem; border-radius: .5rem;
+  background: #fff url('/images/TemariNet.png') center / contain no-repeat;
+}
+footer > div:first-child > div:first-child > div:first-child::after {
+  content: "እውቀትNET"; position: absolute; left: 4.25rem; top: .65rem;
+  color: #F4B740; font-size: 1.125rem; font-weight: 800; letter-spacing: -.01em;
+}
+
 /* A calm, generous rhythm for the main landing-page sections. */
 .py-18 {
   padding-top: 4.5rem;
@@ -49,4 +77,9 @@ a {
 @keyframes classroom-pan {
   from { transform: scale(1.02) translate3d(-1.5%, -0.5%, 0); }
   to { transform: scale(1.13) translate3d(1.5%, 0.5%, 0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(0.5deg); }
 }

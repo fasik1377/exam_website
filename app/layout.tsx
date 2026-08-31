@@ -13,9 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ExamMaster Ethiopia",
+  title: "እውቀትNET | Ethiopian Exam Preparation",
   description:
-    "A simple national exam preparation platform for students, teachers, and school administrators.",
+    "እውቀትNET exam preparation for Ethiopian students, teachers, and schools.",
+  icons: { icon: "/images/TemariNet.png", shortcut: "/images/TemariNet.png", apple: "/images/TemariNet.png" },
 };
 
 export default function RootLayout({

@@ -32,9 +32,9 @@ export default function Home() {
     <main className="min-h-screen overflow-hidden bg-[#fbfcf8] text-[#173e2d]">
       <header className="sticky top-0 z-30 border-b border-[#e1e8df] bg-[#fbfcf8]/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
-          <a href="#home" className="flex items-center gap-3" aria-label="Examora home">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1e5b43] text-white"><GraduationCap size={22} /></span>
-            <span><span className="block text-lg font-bold tracking-tight">Examora</span><span className="block text-[10px] font-bold uppercase tracking-[0.18em] text-[#668071]">Ethiopia</span></span>
+          <a href="#home" className="flex items-center gap-3" aria-label="እውቀትNET home">
+            <img src="/images/TemariNet.png" alt="እውቀትNET" className="h-11 w-11 rounded-lg object-contain" />
+            <span className="text-xl font-extrabold tracking-tight"><span className="text-[#0B1F3A]">እውቀት</span><span className="text-[#F4B740]">NET</span></span>
           </a>
           <nav className="hidden items-center gap-7 text-sm font-semibold text-[#526258] md:flex">
             <a href="#grades" className="hover:text-[#1e5b43]">Grades</a>
@@ -48,19 +48,19 @@ export default function Home() {
         {menuOpen && <nav className="border-t border-[#e1e8df] px-5 py-4 md:hidden"><div className="mx-auto flex max-w-7xl flex-col gap-3 text-sm font-semibold"><a href="#grades">Grades</a><a href="#subscriptions">Plans</a><a href="#support">Student support</a><a href="/admin/login">Teacher portal</a></div></nav>}
       </header>
 
-      <section id="home" className="relative isolate overflow-hidden bg-[#e9f2e9]">
+      <section id="home" className="relative isolate overflow-hidden bg-[#0B1F3A]">
         <div className="hero-classroom-image absolute inset-0 -z-20 bg-cover bg-center opacity-80" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#e9f2e9] via-[#e9f2e9]/92 to-[#e9f2e9]/15" />
-        <div className="absolute -right-24 top-0 -z-10 h-80 w-80 rounded-full bg-[#d4e9b9] blur-3xl" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0B1F3A] via-[#0B1F3A]/95 to-[#155EEF]/40" />
+        <div className="absolute -right-24 top-0 -z-10 h-80 w-80 animate-pulse rounded-full bg-[#F4B740]/30 blur-3xl" />
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-16 lg:grid-cols-[1.05fr_.95fr] lg:px-8 lg:py-24">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-[#bad3be] bg-white/70 px-3 py-2 text-xs font-bold text-[#276247]"><Sparkles size={15} /> EXAM PREPARATION FOR GRADES 9-12</p>
-            <h1 className="mt-6 max-w-2xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">Prepare with confidence for every exam.</h1>
+            <h1 className="mt-6 max-w-2xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">Prepare with confidence for every exam.</h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-[#526258]">Practise by grade and subject, learn from clear explanations, and get help from qualified teachers when you need it.</p>
             <div className="mt-8 flex flex-wrap gap-3"><a href="#grades" className="inline-flex items-center gap-2 rounded-xl bg-[#1e5b43] px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-900/15 hover:bg-[#174633]">Start practising <ArrowRight size={17} /></a><a href="#subscriptions" className="rounded-xl border border-[#bad3be] bg-white px-5 py-3.5 text-sm font-bold text-[#305140]">View plans</a></div>
             <div className="mt-8 flex flex-wrap gap-5 text-sm font-semibold text-[#466252]"><span className="flex items-center gap-2"><CheckCircle2 size={17} className="text-[#4d9b62]" />Curriculum-focused</span><span className="flex items-center gap-2"><CheckCircle2 size={17} className="text-[#4d9b62]" />Teacher support</span><span className="flex items-center gap-2"><CheckCircle2 size={17} className="text-[#4d9b62]" />Study anywhere</span></div>
           </div>
-          <div className="relative mx-auto w-full max-w-md rounded-3xl border-[6px] border-[#173e2d] bg-white p-6 shadow-2xl shadow-emerald-950/20">
+          <div className="relative mx-auto w-full max-w-md animate-[float_6s_ease-in-out_infinite] rounded-3xl border-[6px] border-[#F4B740] bg-white p-6 shadow-2xl shadow-black/30">
             <div className="flex items-center justify-between border-b border-[#e3e9e1] pb-5"><div><p className="text-xs font-bold uppercase tracking-wider text-[#718277]">Practice exam</p><p className="mt-1 font-bold">Mathematics · Grade 12</p></div><span className="rounded-lg bg-[#e5f2e4] px-2.5 py-1.5 text-xs font-bold text-[#287046]">Question 4 / 10</span></div>
             <div className="mt-6 h-2 overflow-hidden rounded-full bg-[#e5e8df]"><div className="h-full w-2/5 rounded-full bg-[#4d9b62]" /></div>
             <p className="mt-7 text-xl font-bold leading-8">What is the value of x if 3x + 6 = 21?</p>
@@ -86,6 +86,7 @@ export default function Home() {
       <section className="border-t border-[#e1e8df] bg-white"><div className="mx-auto grid max-w-7xl gap-8 px-5 py-16 lg:grid-cols-2 lg:px-8"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#4d8c5e]">Teacher administration</p><h2 className="mt-3 text-3xl font-bold">Everything teachers need to support students.</h2><p className="mt-4 max-w-lg leading-7 text-[#68766d]">Teachers manage subjects, upload questions and explanations, review student progress, and respond to student chats from one secure portal.</p><a href="/admin/login" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#1e5b43] px-5 py-3 text-sm font-bold text-white">Teacher login <ArrowRight size={17} /></a></div><div className="grid gap-3 sm:grid-cols-2">{[["Subject question banks", BookOpen], ["Student support chat", MessageCircle], ["Subscription access", CreditCard], ["Secure teacher portal", ShieldCheck]].map(([title, Icon]) => { const FeatureIcon = Icon as typeof BookOpen; return <div key={title as string} className="rounded-2xl border border-[#e1e7df] bg-[#fbfcf8] p-5"><FeatureIcon className="text-[#4d8c5e]" size={22} /><p className="mt-5 font-bold">{title as string}</p></div>; })}</div></div></section>
 
       <footer className="bg-[#173e2d] text-white"><div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8"><div><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d5e9bc] text-[#173e2d]"><GraduationCap size={21} /></span><div><p className="text-lg font-bold">Examora Ethiopia</p><p className="text-xs font-semibold uppercase tracking-[.16em] text-[#b8dbba]">Learn with confidence</p></div></div><p className="mt-5 max-w-sm text-sm leading-6 text-[#c7dbca]">A focused exam preparation platform for Ethiopian students in Grades 9 to 12.</p></div><div><p className="text-sm font-bold">Student learning</p><div className="mt-4 grid gap-3 text-sm text-[#c7dbca]"><a href="#grades" className="hover:text-white">Browse subjects</a><a href="#subscriptions" className="hover:text-white">Subscriptions</a><a href="#support" className="hover:text-white">Teacher support</a></div></div><div><p className="text-sm font-bold">Educators</p><div className="mt-4 grid gap-3 text-sm text-[#c7dbca]"><a href="/admin/login" className="hover:text-white">Teacher login</a><a href="/admin" className="hover:text-white">Question bank</a><a href="/super-admin/login" className="hover:text-white">Platform management</a></div></div><div><p className="text-sm font-bold">Need help?</p><p className="mt-4 text-sm leading-6 text-[#c7dbca]">Students can reach a subject teacher from any practice question.</p><a href="#support" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-[#d5e9bc] hover:text-white">Open support <ArrowRight size={16} /></a></div></div><div className="border-t border-white/10"><div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-xs text-[#b8dbba] sm:flex-row sm:items-center sm:justify-between lg:px-8"><span>© 2026 Examora Ethiopia. All rights reserved.</span><span>Practice · Learn · Succeed</span></div></div></footer>
+      <div className="border-t border-white/10 bg-[#0B1F3A] py-4 text-center text-sm text-white/70">Developed by <a href="https://fasik1377.github.io/fasika-abera/" target="_blank" rel="noreferrer" className="font-bold text-[#F4B740] hover:text-white">Fasika Abera</a></div>
     </main>
   );
 }
