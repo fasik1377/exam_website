@@ -1,20 +1,183 @@
 "use client";
-
-import { Ban, CheckCircle2, CreditCard, ShieldCheck, UserCheck, Users } from "lucide-react";
+import { motion } from "framer-motion";
+import { BookOpen, GraduationCap, LoaderCircle, RefreshCw, Search, ShieldCheck, UserCheck, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import Brand from "@/app/components/Brand";
+import LogoutButton from "@/app/components/LogoutButton";
 
-type Account = { name: string; email: string; role: "Student" | "Teacher"; plan: string; status: "Active" | "Restricted" | "Banned" };
-const initialAccounts: Account[] = [
-  { name: "Abel Tadesse", email: "abel@student.com", role: "Student", plan: "Yearly", status: "Active" },
-  { name: "Mekdes Ayele", email: "mekdes@student.com", role: "Student", plan: "Monthly", status: "Restricted" },
-  { name: "Hana Desta", email: "hana@teacher.com", role: "Teacher", plan: "Teacher", status: "Active" },
-  { name: "Solomon Bekele", email: "solomon@teacher.com", role: "Teacher", plan: "Teacher", status: "Active" },
-];
+type Account = { id: string; name: string; email: string; role: string; plan: string; status: "active" | "restricted" | "banned" };
 
-export default function SuperAdminDashboard() {
-  const [accounts, setAccounts] = useState(initialAccounts);
-  const [showPayments, setShowPayments] = useState(false);
-  const setStatus = (email: string, status: Account["status"]) => setAccounts((items) => items.map((item) => item.email === email ? { ...item, status } : item));
-  return <main className="min-h-screen bg-[#f7faf5] text-[#173e2d]"><header className="border-b border-[#dfe9dc] bg-[#173e2d] text-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4"><Link href="/" className="flex items-center gap-2 font-bold"><ShieldCheck size={21} className="text-[#d5e9bc]" /> Examora Platform Admin</Link><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-[#d5e9bc]">Super admin access</span></div></header><div className="mx-auto max-w-7xl px-5 py-8"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#4d8c5e]">Platform oversight</p><h1 className="mt-2 text-3xl font-bold">Manage people, access, and payments.</h1><p className="mt-2 text-[#68766d]">Apply access controls, review subscriptions, and oversee the teaching team from one place.</p><div className="mt-7 grid gap-4 sm:grid-cols-3">{[["1,248", "Active students", Users], ["18", "Teaching accounts", UserCheck], ["ETB 84,600", "This month’s payments", CreditCard]].map(([value, label, Icon]) => { const MetricIcon = Icon as typeof Users; return <div key={label as string} className="rounded-2xl border border-[#dfe9dc] bg-white p-5"><MetricIcon className="text-[#4d8c5e]" size={21} /><p className="mt-4 text-2xl font-bold">{value as string}</p><p className="text-sm text-[#718277]">{label as string}</p></div>; })}</div><div className="mt-8 grid gap-6 lg:grid-cols-[1.3fr_.7fr]"><section className="rounded-2xl border border-[#dfe9dc] bg-white p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold">Account access controls</h2><p className="mt-1 text-sm text-[#718277]">Restrict or ban student and teacher accounts when required.</p></div><span className="rounded-full bg-[#eef7eb] px-3 py-1.5 text-xs font-bold text-[#287046]">{accounts.filter((item) => item.status === "Active").length} active</span></div><div className="mt-5 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-[#e4ebe2] text-xs uppercase tracking-wide text-[#718277]"><tr><th className="pb-3">Account</th><th className="pb-3">Role</th><th className="pb-3">Status</th><th className="pb-3">Action</th></tr></thead><tbody>{accounts.map((account) => <tr key={account.email} className="border-b border-[#eef2ed]"><td className="py-4"><p className="font-bold">{account.name}</p><p className="text-xs text-[#718277]">{account.email}</p></td><td className="py-4">{account.role}</td><td className="py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${account.status === "Active" ? "bg-[#e8f3e6] text-[#287046]" : account.status === "Restricted" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>{account.status}</span></td><td className="py-4"><div className="flex flex-wrap gap-2"><button onClick={() => setStatus(account.email, account.status === "Restricted" ? "Active" : "Restricted")} className="rounded-lg border border-[#dfe9dc] px-2 py-1.5 text-xs font-bold text-[#426554]">{account.status === "Restricted" ? "Restore" : "Restrict"}</button><button onClick={() => setStatus(account.email, account.status === "Banned" ? "Active" : "Banned")} className="rounded-lg bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700">{account.status === "Banned" ? "Unban" : "Ban"}</button></div></td></tr>)}</tbody></table></div></section><aside className="rounded-2xl border border-[#dfe9dc] bg-white p-5"><CreditCard className="text-[#4d8c5e]" size={22} /><h2 className="mt-4 font-bold">Payment management</h2><p className="mt-2 text-sm leading-6 text-[#68766d]">Review subscriptions and payment records before approving access.</p><button onClick={() => setShowPayments(!showPayments)} className="mt-5 w-full rounded-xl bg-[#1e5b43] px-4 py-3 text-sm font-bold text-white">{showPayments ? "Hide payment records" : "View payment records"}</button>{showPayments && <div className="mt-4 space-y-3">{[["Abel Tadesse", "Yearly", "ETB 1,000", "Paid"], ["Mekdes Ayele", "Monthly", "ETB 200", "Pending"], ["Yared Mulu", "Monthly", "ETB 200", "Paid"]].map(([name, plan, amount, status]) => <div key={name} className="rounded-xl bg-[#f3f7f1] p-3 text-sm"><div className="flex justify-between gap-3"><p className="font-bold">{name}</p><span className={status === "Paid" ? "text-[#287046]" : "text-amber-700"}>{status}</span></div><p className="mt-1 text-xs text-[#718277]">{plan} · {amount}</p></div>)}</div>}<div className="mt-5 rounded-xl bg-[#f3f7f1] p-3 text-xs leading-5 text-[#526258]"><CheckCircle2 className="mr-1 inline text-[#4d8c5e]" size={15} /> Payment visibility is restricted to the super-admin role.</div></aside></div><div className="mt-6 rounded-2xl border border-[#dfe9dc] bg-white p-5"><div className="flex items-start gap-3"><Ban className="mt-0.5 text-red-600" size={20} /><div><h2 className="font-bold">Access policy</h2><p className="mt-1 text-sm leading-6 text-[#68766d]">Restricted students cannot open paid exams or teacher chat. Banned accounts are blocked from the platform. Restricted teachers cannot publish questions or respond to students until restored.</p></div></div></div></div></main>;
+const ROLE_LABEL: Record<string, string> = { student: "Student", admin: "Teacher", "super-admin": "Platform admin" };
+const STATUS_STYLE: Record<Account["status"], string> = { active: "bg-green-50 text-green-700", restricted: "bg-amber-50 text-amber-700", banned: "bg-red-50 text-red-700" };
+
+type Directory = { users?: Account[]; me?: string; error?: string };
+
+async function fetchDirectory(): Promise<Directory> {
+  const response = await fetch("/api/admin/users", { cache: "no-store" }).catch(() => null);
+  if (!response) return { error: "Network error — could not load accounts." };
+  if (response.status === 401 || response.status === 403) { window.location.href = "/super-admin/login"; return {}; }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) return { error: data.error || "Could not load accounts." };
+  return { users: data.users, me: data.me };
+}
+
+export default function SuperAdmin() {
+  const [users, setUsers] = useState<Account[]>([]);
+  const [me, setMe] = useState("");
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "admin" });
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const apply = useCallback((result: Directory) => {
+    setRefreshing(false);
+    if (result.error) setMessage({ ok: false, text: result.error });
+    if (result.users) { setUsers(result.users); setMe(result.me ?? ""); }
+  }, []);
+  const load = useCallback(() => { setRefreshing(true); return fetchDirectory().then(apply); }, [apply]);
+
+  useEffect(() => {
+    let active = true;
+    fetchDirectory().then((result) => active && apply(result));
+    return () => { active = false; };
+  }, [apply]);
+
+  const filtered = useMemo(
+    () => users.filter((u) => (roleFilter === "all" || u.role === roleFilter) && (u.name + u.email + u.role).toLowerCase().includes(query.toLowerCase())),
+    [users, query, roleFilter],
+  );
+  const stats = [
+    { value: users.length, label: "Total accounts", icon: Users, color: "bg-blue-50 text-royal" },
+    { value: users.filter((u) => u.role === "admin").length, label: "Teachers", icon: BookOpen, color: "bg-violet-50 text-violet-600" },
+    { value: users.filter((u) => u.role === "student").length, label: "Students", icon: GraduationCap, color: "bg-amber-50 text-amber-600" },
+    { value: users.filter((u) => u.status === "active").length, label: "Active accounts", icon: UserCheck, color: "bg-green-50 text-green-600" },
+  ];
+
+  async function create(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    setMessage(null);
+    const response = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }).catch(() => null);
+    const data = await response?.json().catch(() => ({}));
+    setLoading(false);
+    if (!response?.ok) return setMessage({ ok: false, text: data?.error || "Could not create the account." });
+    setMessage({ ok: true, text: `${ROLE_LABEL[form.role]} account created for ${form.email}. Share the password with them securely.` });
+    setForm({ name: "", email: "", password: "", role: form.role });
+    load();
+  }
+
+  async function update(id: string, status: Account["status"]) {
+    setUsers((list) => list.map((u) => (u.id === id ? { ...u, status } : u)));
+    const response = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) }).catch(() => null);
+    if (!response?.ok) {
+      const data = await response?.json().catch(() => ({}));
+      setMessage({ ok: false, text: data?.error || "Could not update the account." });
+    }
+    load();
+  }
+
+  return (
+    <main className="min-h-screen bg-[#f7f9fc] text-navy">
+      <header className="sticky top-0 z-30 bg-navy text-white shadow-lg">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3">
+          <Brand tone="light" size="sm" subtitle="Platform administration" />
+          <div className="flex items-center gap-2">
+            <Link href="/admin" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-white/80 hover:bg-white/10 sm:inline-flex"><BookOpen size={16} /> Question bank</Link>
+            <LogoutButton tone="light" />
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-7xl px-5 py-9">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[.16em] text-royal"><ShieldCheck size={14} /> Platform oversight</p>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-tight">Administration center</h1>
+          </div>
+          <button onClick={load} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold hover:border-royal">
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /> Refresh
+          </button>
+        </motion.div>
+
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map(({ value, label, icon: Icon, color }, i) => (
+            <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 + i * 0.06 }} className="card-lift rounded-2xl border border-slate-200 bg-white p-5">
+              <span className={`grid h-10 w-10 place-items-center rounded-xl ${color}`}><Icon size={20} /></span>
+              <p className="mt-4 text-3xl font-extrabold">{value}</p>
+              <p className="text-sm text-slate-500">{label}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="flex items-center gap-2"><UserPlus size={20} className="text-royal" /><h2 className="font-bold">Add staff account</h2></div>
+          <p className="mt-1 text-sm text-slate-500">Create credentials for a teacher or another platform administrator.</p>
+          <form onSubmit={create} className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_.8fr_auto]">
+            <input required minLength={2} placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl border border-slate-200 p-3 outline-none focus:border-royal" />
+            <input required type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="rounded-xl border border-slate-200 p-3 outline-none focus:border-royal" />
+            <input required minLength={8} type="password" placeholder="Temporary password (8+)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="rounded-xl border border-slate-200 p-3 outline-none focus:border-royal" />
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="rounded-xl border border-slate-200 p-3">
+              <option value="admin">Teacher</option>
+              <option value="super-admin">Platform admin</option>
+            </select>
+            <button disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-5 py-3 font-bold text-white hover:bg-royal disabled:opacity-60">
+              {loading ? <LoaderCircle size={18} className="animate-spin" /> : <UserPlus size={18} />} Create
+            </button>
+          </form>
+          {message && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`mt-4 rounded-xl p-3 text-sm font-semibold ${message.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>{message.text}</motion.p>}
+        </section>
+
+        <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2"><Users size={20} className="text-royal" /><h2 className="font-bold">User directory</h2></div>
+            <div className="flex flex-wrap gap-2">
+              <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                <option value="all">All roles</option>
+                <option value="student">Students</option>
+                <option value="admin">Teachers</option>
+                <option value="super-admin">Platform admins</option>
+              </select>
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm focus-within:border-royal">
+                <Search size={16} className="text-slate-400" />
+                <input placeholder="Search users" value={query} onChange={(e) => setQuery(e.target.value)} className="w-44 outline-none" />
+              </label>
+            </div>
+          </div>
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500">
+                <tr><th className="pb-3">User</th><th className="pb-3">Role</th><th className="pb-3">Plan</th><th className="pb-3">Status</th><th className="pb-3">Access</th></tr>
+              </thead>
+              <tbody>
+                {filtered.map((u) => (
+                  <tr key={u.id} className="border-b border-slate-100 transition-colors hover:bg-slate-50/70">
+                    <td className="py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="grid h-9 w-9 place-items-center rounded-full bg-navy text-xs font-bold text-white">{u.name.charAt(0).toUpperCase()}</span>
+                        <div><p className="font-bold">{u.name}{u.id === me && <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-royal">YOU</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div>
+                      </div>
+                    </td>
+                    <td>{ROLE_LABEL[u.role] ?? u.role}</td>
+                    <td className="capitalize">{u.plan}</td>
+                    <td><span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${STATUS_STYLE[u.status]}`}>{u.status}</span></td>
+                    <td>
+                      <select disabled={u.id === me} value={u.status} onChange={(e) => update(u.id, e.target.value as Account["status"])} className="rounded-xl border border-slate-200 px-3 py-2 disabled:opacity-50">
+                        <option value="active">Active</option>
+                        <option value="restricted">Restricted</option>
+                        <option value="banned">Banned</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!filtered.length && <p className="py-10 text-center text-sm text-slate-500">No matching accounts.</p>}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
 }

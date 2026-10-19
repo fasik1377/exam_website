@@ -1,197 +1,60 @@
 "use client";
-
-import { motion } from "framer-motion";
-import {
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  GraduationCap,
-  KeyRound,
-  LockKeyhole,
-  Mail,
-  ShieldCheck,
-} from "lucide-react";
+import { KeyRound, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState, type FormEvent } from "react";
+import AuthShell, { Field, FormError, SubmitButton } from "@/app/components/AuthShell";
+import { useSession } from "@/app/components/useSession";
 
-type RoleLoginProps = {
-  role: "Admin" | "Super Admin";
-  eyebrow: string;
-  title: string;
-  description: string;
-  accent: "teal" | "sky";
-  permissions: string[];
-};
+type Props = { role: "Admin" | "Super Admin"; eyebrow: string; title: string; description: string; accent?: "teal" | "sky"; permissions: string[] };
 
-const accentStyles = {
-  teal: {
-    button: "bg-[#1e5b43] hover:bg-[#174633]",
-    icon: "bg-[#e8f3e6] text-[#1e5b43]",
-    ring: "ring-[#d9e9da]",
-    text: "text-[#1e5b43]",
-  },
-  sky: {
-    button: "bg-[#1e5b43] hover:bg-[#174633]",
-    icon: "bg-[#e8f3e6] text-[#1e5b43]",
-    ring: "ring-[#d9e9da]",
-    text: "text-[#1e5b43]",
-  },
-};
+export default function RoleLogin({ role, eyebrow, title, description, permissions }: Props) {
+  const { user } = useSession();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const roleValue = role === "Admin" ? "admin" : "super-admin";
+  const home = role === "Admin" ? "/admin" : "/super-admin";
 
-export default function RoleLogin({
-  role,
-  eyebrow,
-  title,
-  description,
-  accent,
-  permissions,
-}: RoleLoginProps) {
-  const styles = accentStyles[accent];
+  // Skip the form if the current session can already use this portal.
+  useEffect(() => {
+    if (!user) return;
+    if (user.role === "super-admin" || (role === "Admin" && user.role === "admin")) window.location.replace(home);
+  }, [user, role, home]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, remember, role: roleValue }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || "Login failed");
+        setLoading(false);
+        return;
+      }
+      window.location.assign(home);
+    } catch {
+      setError("Network error — check your connection and try again.");
+      setLoading(false);
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-[#f7faf5] text-slate-900">
-      <div className="absolute inset-0 overflow-hidden">
-        <motion.div
-          animate={{ y: [0, -18, 0], rotate: [0, 2, 0] }}
-          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-8 top-24 h-40 w-40 rounded-full bg-[#dcefd9]/80 blur-2xl"
-        />
-        <motion.div
-          animate={{ y: [0, 22, 0], rotate: [0, -3, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-20 right-10 h-48 w-48 rounded-full bg-[#d5e9bc]/80 blur-2xl"
-        />
-      </div>
-
-      <div className="relative mx-auto grid min-h-screen max-w-6xl items-center gap-8 px-5 py-10 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-[#1e5b43]"
-          >
-            <ArrowLeft size={17} />
-            Back to home
-          </Link>
-
-          <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
-            <ShieldCheck size={16} className={styles.text} />
-            {eyebrow}
-          </div>
-
-          <h1 className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-tight text-slate-950 md:text-4xl">
-            {title}
-          </h1>
-          <p className="mt-5 max-w-xl leading-8 text-slate-600">
-            {description}
-          </p>
-
-          <div className="mt-8 grid gap-3">
-            {permissions.map((permission) => (
-              <motion.div
-                initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4 }}
-                key={permission}
-                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <CheckCircle2 className={styles.text} size={20} />
-                <span className="text-sm font-medium text-slate-700">
-                  {permission}
-                </span>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-
-        <motion.section
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.08 }}
-          className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-[#d9e9da]/70 ring-8 ${styles.ring} sm:p-8`}
-        >
-          <div className="flex items-center gap-3">
-            <span className={`flex h-12 w-12 items-center justify-center rounded-xl ${styles.icon}`}>
-              {role === "Admin" ? <GraduationCap size={24} /> : <LockKeyhole size={23} />}
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-slate-500">
-                Secure portal
-              </p>
-              <h2 className="text-xl font-semibold text-slate-950">
-                {role} Login
-              </h2>
-            </div>
-          </div>
-
-          <form className="mt-8 space-y-5">
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Email address
-              </span>
-              <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-[#f7faf5] px-4 py-3 focus-within:border-[#8eb697]">
-                <Mail size={18} className="text-slate-400" />
-                <input
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-                  type="email"
-                  placeholder={
-                    role === "Admin"
-                      ? "teacher@example.com"
-                      : "superadmin@example.com"
-                  }
-                />
-              </span>
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Password
-              </span>
-              <span className="mt-2 flex items-center gap-3 rounded-xl border border-slate-200 bg-[#f7faf5] px-4 py-3 focus-within:border-[#8eb697]">
-                <KeyRound size={18} className="text-slate-400" />
-                <input
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-                  type="password"
-                  placeholder="Enter your password"
-                />
-              </span>
-            </label>
-
-            <div className="flex items-center justify-between gap-4 text-sm">
-              <label className="flex items-center gap-2 font-medium text-slate-600">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-[#1e5b43]"
-                />
-                Remember me
-              </label>
-              <a href="#" className={`font-semibold ${styles.text}`}>
-                Forgot password?
-              </a>
-            </div>
-
-            <Link
-              href={role === "Admin" ? "/admin" : "/super-admin"}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition ${styles.button}`}
-            >
-              Continue to Dashboard
-              <LockKeyhole size={17} />
-            </Link>
-          </form>
-
-          <div className="mt-6 rounded-xl border border-slate-200 bg-[#f7faf5] p-4">
-            <div className="flex gap-3">
-              <BookOpen className={styles.text} size={20} />
-              <p className="text-sm leading-6 text-slate-600">
-                Login validation and dashboard navigation are ready for backend
-                connection when authentication is added.
-              </p>
-            </div>
-          </div>
-        </motion.section>
-      </div>
-    </main>
+    <AuthShell eyebrow={eyebrow} title={title} description={description} points={permissions.slice(0, 4)}>
+      <span className="inline-flex items-center gap-2 rounded-full bg-royal/10 px-3 py-1 text-xs font-bold text-royal"><ShieldCheck size={14} /> Secure staff access</span>
+      <h2 className="mt-4 text-3xl font-extrabold tracking-tight">{role === "Admin" ? "Teacher" : "Platform admin"} login</h2>
+      <p className="mt-2 text-sm text-slate-500">Use the credentials provided by your platform administrator.</p>
+      <form onSubmit={submit} className="mt-8 grid gap-4">
+        <Field label="Email" icon={<Mail size={17} />} required type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+        <Field label="Password" icon={<KeyRound size={17} />} required type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
+        <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-royal" /> Remember me for 14 days</label>
+        <FormError message={error} />
+        <SubmitButton loading={loading} loadingText="Signing in...">Continue to dashboard <LockKeyhole size={17} /></SubmitButton>
+      </form>
+      <p className="mt-6 text-center text-sm text-slate-500">Are you a student? <Link href="/login" className="font-bold text-royal hover:underline">Student sign in</Link></p>
+    </AuthShell>
   );
 }

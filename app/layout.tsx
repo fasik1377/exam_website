@@ -1,22 +1,28 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Noto_Sans_Ethiopic, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import MotionProvider from "@/app/components/MotionProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const ethiopic = Noto_Sans_Ethiopic({
+  variable: "--font-ethiopic",
+  subsets: ["ethiopic"],
+  weight: ["500", "700", "800"],
 });
 
+// Browser-tab and home-screen icons come from app/icon.png and app/apple-icon.png (file conventions).
 export const metadata: Metadata = {
   title: "እውቀትNET | Ethiopian Exam Preparation",
-  description:
-    "እውቀትNET exam preparation for Ethiopian students, teachers, and schools.",
-  icons: { icon: "/images/TemariNet.png", shortcut: "/images/TemariNet.png", apple: "/images/TemariNet.png" },
+  description: "እውቀትNET exam preparation for Ethiopian students, teachers, and schools.",
+  applicationName: "እውቀትNET",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0B1F3A",
 };
 
 export default function RootLayout({
@@ -25,11 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${jakarta.variable} ${ethiopic.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col"><MotionProvider>{children}</MotionProvider></body>
     </html>
   );
 }

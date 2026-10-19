@@ -1,22 +1,167 @@
 "use client";
-
-import { BookOpen, CheckCircle2, MessageCircle, Plus, Send, Users, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { BookOpen, CheckCircle2, LoaderCircle, Plus, ShieldCheck, Users, X } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Brand from "@/app/components/Brand";
+import LogoutButton from "@/app/components/LogoutButton";
+import { useSession } from "@/app/components/useSession";
+import { SUBJECTS as ALL_SUBJECTS } from "@/lib/subjects";
 
-type Question = { subject: string; grade: string; unit: string; question: string; answer: string; explanation: string };
-const subjectRows = [["Mathematics", "Grade 12", "124 questions", "8 chats"], ["Biology", "Grade 11", "96 questions", "3 chats"], ["English", "Grade 10", "88 questions", "5 chats"], ["History", "Grade 9", "71 questions", "2 chats"]];
-const blank = { subject: "Mathematics", grade: "Grade 12", unit: "Unit 1", question: "", answer: "", explanation: "" };
+type Recent = { id: string; question: string; subject: string; grade: string; unit: string };
+type Summary = { questions: number; students: number; attempts: number; recent: Recent[] };
+
+type Loaded<T> = { data?: T; error?: string };
+
+async function fetchSummary(): Promise<Loaded<Summary>> {
+  const response = await fetch("/api/admin/summary", { cache: "no-store" }).catch(() => null);
+  if (!response) return { error: "Network error — could not load the dashboard." };
+  if (response.status === 401 || response.status === 403) { window.location.href = "/admin/login"; return {}; }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) return { error: data.error || "Could not load the dashboard." };
+  return { data };
+}
+
+const initial = { subject: "Mathematics", grade: "Grade 12", unit: "Unit 1: Algebra", year: "2016 E.C.", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
+const SUBJECTS = ALL_SUBJECTS.map((s) => s.name);
+const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 
 export default function TeacherDashboard() {
-  const [reply, setReply] = useState("");
-  const [sent, setSent] = useState(false);
+  const { user } = useSession();
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [loadError, setLoadError] = useState("");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(blank);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [form, setForm] = useState(initial);
+  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const update = (key: keyof typeof form, value: string) => setForm({ ...form, [key]: value });
-  function saveQuestion(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!form.question.trim() || !form.answer.trim() || !form.explanation.trim()) return; setQuestions([form, ...questions]); setForm(blank); setOpen(false); setNotice("Question saved and added to the selected question bank."); }
+  const [saving, setSaving] = useState(false);
 
-  return <main className="min-h-screen bg-[#f7faf5] text-[#173e2d]"><header className="border-b border-[#dfe9dc] bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4"><Link href="/" className="flex items-center gap-2 font-bold text-[#1e5b43]"><BookOpen size={20} /> Examora Teacher</Link><span className="rounded-full bg-[#e8f3e6] px-3 py-1.5 text-xs font-bold text-[#287046]">Teacher Hana · Online</span></div></header><div className="mx-auto max-w-7xl px-5 py-8"><p className="text-xs font-bold uppercase tracking-[.16em] text-[#4d8c5e]">Teacher dashboard</p><h1 className="mt-2 text-3xl font-bold">Welcome back, Hana.</h1><p className="mt-2 text-[#68766d]">Manage subject questions and help students prepare with confidence.</p><div className="mt-7 grid gap-4 sm:grid-cols-3">{[["379", "Published questions", BookOpen], ["18", "Open student chats", MessageCircle], ["246", "Active students", Users]].map(([value, label, Icon]) => { const MetricIcon = Icon as typeof BookOpen; return <div key={label as string} className="rounded-2xl border border-[#dfe9dc] bg-white p-5"><MetricIcon className="text-[#4d8c5e]" size={21} /><p className="mt-4 text-2xl font-bold">{value as string}</p><p className="text-sm text-[#718277]">{label as string}</p></div>; })}</div>{notice && <div className="mt-6 flex items-center justify-between rounded-2xl border border-[#b9d6bd] bg-[#eef7eb] p-4 text-sm font-semibold text-[#287046]"><span className="flex items-center gap-2"><CheckCircle2 size={18} />{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss"><X size={18} /></button></div>}<div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_.8fr]"><section className="rounded-2xl border border-[#dfe9dc] bg-white p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold">Your subject question banks</h2><p className="mt-1 text-sm text-[#718277]">Create questions, answer keys, explanations, and units.</p></div><button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#1e5b43] px-3 py-2.5 text-sm font-bold text-white"><Plus size={16} /> Add question</button></div><div className="mt-5 overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-[#e4ebe2] text-xs uppercase tracking-wide text-[#718277]"><tr><th className="pb-3">Subject</th><th className="pb-3">Grade</th><th className="pb-3">Content</th><th className="pb-3">Support</th></tr></thead><tbody>{subjectRows.map(([subject, grade, content, chats]) => <tr key={subject} className="border-b border-[#eef2ed]"><td className="py-4 font-bold">{subject}</td><td className="py-4">{grade}</td><td className="py-4 text-[#526258]">{content}</td><td className="py-4 font-semibold text-[#287046]">{chats}</td></tr>)}</tbody></table></div>{questions.length > 0 && <div className="mt-6 border-t border-[#e4ebe2] pt-5"><p className="text-sm font-bold">Recently added</p>{questions.map((item, index) => <div key={`${item.question}-${index}`} className="mt-3 rounded-xl bg-[#f3f7f1] p-3"><p className="text-sm font-semibold">{item.question}</p><p className="mt-1 text-xs text-[#718277]">{item.subject} · {item.grade} · {item.unit}</p></div>)}</div>}</section><section className="overflow-hidden rounded-2xl border border-[#dfe9dc] bg-white"><div className="bg-[#173e2d] p-5 text-white"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#d5e9bc] font-bold text-[#173e2d]">A</span><div><h2 className="font-bold">Abel Tadesse</h2><p className="text-xs text-[#c7dbca]">Grade 12 · Mathematics</p></div></div></div><div className="space-y-3 p-5 text-sm"><div className="rounded-xl bg-[#eef6ec] p-3 text-[#426554]">Teacher, can you explain how to solve question 4?</div>{sent && <div className="ml-auto rounded-xl bg-[#1e5b43] p-3 text-white">{reply}</div>}<p className="flex items-center gap-2 text-xs font-semibold text-[#4d8c5e]"><CheckCircle2 size={15} /> Teacher explanations are visible to this student.</p></div><form onSubmit={(event) => { event.preventDefault(); if (reply.trim()) setSent(true); }} className="flex gap-2 border-t border-[#e4ebe2] p-3"><input value={reply} onChange={(event) => { setReply(event.target.value); setSent(false); }} placeholder="Write a helpful reply..." className="min-w-0 flex-1 rounded-xl bg-[#f3f7f1] px-3 py-2.5 text-sm outline-none"/><button className="rounded-xl bg-[#1e5b43] p-2.5 text-white" aria-label="Send reply"><Send size={17} /></button></form></section></div></div>{open && <div className="fixed inset-0 z-50 overflow-y-auto bg-[#173e2d]/50 p-4 sm:p-8"><form onSubmit={saveQuestion} className="mx-auto max-w-2xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8"><div className="flex justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[#4d8c5e]">Question builder</p><h2 className="mt-2 text-2xl font-bold">Add a practice question</h2></div><button type="button" onClick={() => setOpen(false)} aria-label="Close"><X /></button></div><p className="mt-3 text-sm text-[#68766d]">Students receive your answer and explanation after submitting a response.</p><div className="mt-6 grid gap-4 sm:grid-cols-3"><label className="text-sm font-bold">Subject<select value={form.subject} onChange={(event) => update("subject", event.target.value)} className="mt-2 w-full rounded-xl border border-[#dfe9dc] bg-[#f7faf5] p-3 text-sm font-medium"><option>Mathematics</option><option>English</option><option>Biology</option><option>Chemistry</option><option>Physics</option><option>History</option><option>Geography</option><option>Economics</option></select></label><label className="text-sm font-bold">Grade<select value={form.grade} onChange={(event) => update("grade", event.target.value)} className="mt-2 w-full rounded-xl border border-[#dfe9dc] bg-[#f7faf5] p-3 text-sm font-medium"><option>Grade 9</option><option>Grade 10</option><option>Grade 11</option><option>Grade 12</option></select></label><label className="text-sm font-bold">Unit<select value={form.unit} onChange={(event) => update("unit", event.target.value)} className="mt-2 w-full rounded-xl border border-[#dfe9dc] bg-[#f7faf5] p-3 text-sm font-medium"><option>Unit 1</option><option>Unit 2</option><option>Unit 3</option><option>Revision</option></select></label></div><label className="mt-4 block text-sm font-bold">Question<textarea required value={form.question} onChange={(event) => update("question", event.target.value)} className="mt-2 min-h-24 w-full rounded-xl border border-[#dfe9dc] bg-[#f7faf5] p-3 text-sm" placeholder="Write the exam question..." /></label><label className="mt-4 block text-sm font-bold">Correct answer<textarea required value={form.answer} onChange={(event) => update("answer", event.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-[#dfe9dc] bg-[#f7faf5] p-3 text-sm" placeholder="Enter the correct answer..." /></label><label className="mt-4 block text-sm font-bold">Teacher explanation<textarea required value={form.explanation} onChange={(event) => update("explanation", event.target.value)} className="mt-2 min-h-28 w-full rounded-xl border border-[#dfe9dc] bg-[#f7faf5] p-3 text-sm" placeholder="Explain the reasoning clearly for students..." /></label><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-[#dfe9dc] px-4 py-3 text-sm font-bold">Cancel</button><button className="inline-flex items-center gap-2 rounded-xl bg-[#1e5b43] px-4 py-3 text-sm font-bold text-white"><CheckCircle2 size={17} /> Save question</button></div></form></div>}</main>;
+  const apply = useCallback((result: Loaded<Summary>) => {
+    setLoadError(result.error ?? "");
+    if (result.data) setSummary(result.data);
+  }, []);
+  const load = useCallback(() => fetchSummary().then(apply), [apply]);
+
+  useEffect(() => {
+    let active = true;
+    fetchSummary().then((result) => active && apply(result));
+    return () => { active = false; };
+  }, [apply]);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setSaving(true);
+    const response = await fetch("/api/questions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }).catch(() => null);
+    setSaving(false);
+    const data = await response?.json().catch(() => ({}));
+    if (!response?.ok) return setError(data?.error || "Could not publish the question.");
+    setForm(initial);
+    setOpen(false);
+    setNotice("Question published to the student exam bank.");
+    window.setTimeout(() => setNotice(""), 5000);
+    load();
+  }
+
+  const setChoice = (i: number, value: string) => setForm({ ...form, choices: form.choices.map((item, index) => (index === i ? value : item)) });
+  const stats = [
+    { value: summary?.questions, label: "Published questions", icon: BookOpen, color: "bg-blue-50 text-royal" },
+    { value: summary?.students, label: "Registered students", icon: Users, color: "bg-amber-50 text-amber-600" },
+    { value: summary?.attempts, label: "Recorded attempts", icon: CheckCircle2, color: "bg-green-50 text-green-600" },
+  ];
+
+  return (
+    <main className="min-h-screen bg-[#f7f9fc] text-navy">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3">
+          <Brand size="sm" subtitle="Teacher dashboard" />
+          <div className="flex items-center gap-2">
+            {user?.role === "super-admin" && <Link href="/super-admin" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-royal hover:bg-blue-50 sm:inline-flex"><ShieldCheck size={16} /> Platform admin</Link>}
+            {user && <span className="hidden text-sm font-semibold text-slate-500 md:inline">{user.name}</span>}
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-7xl px-5 py-9">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.16em] text-royal">Welcome{user ? `, ${user.name.split(" ")[0]}` : ""} 👋</p>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-tight">Manage the live question bank.</h1>
+          </div>
+          <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => setOpen(true)} className="btn-shine inline-flex items-center gap-2 rounded-xl bg-navy px-5 py-3 text-sm font-bold text-white shadow-lg shadow-navy/15 hover:bg-royal">
+            <Plus size={17} /> Add question
+          </motion.button>
+        </motion.div>
+
+        <AnimatePresence>
+          {notice && <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mt-6 overflow-hidden rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-800">{notice}</motion.p>}
+        </AnimatePresence>
+        {loadError && <p className="mt-6 rounded-xl border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-700">{loadError}</p>}
+
+        <div className="mt-7 grid gap-4 sm:grid-cols-3">
+          {stats.map(({ value, label, icon: Icon, color }, i) => (
+            <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 + i * 0.07 }} className="card-lift rounded-2xl border border-slate-200 bg-white p-5">
+              <span className={`grid h-10 w-10 place-items-center rounded-xl ${color}`}><Icon size={20} /></span>
+              <p className="mt-4 text-3xl font-extrabold">{value ?? <span className="inline-block h-8 w-12 animate-pulse rounded bg-slate-100 align-middle" />}</p>
+              <p className="text-sm text-slate-500">{label}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-6">
+          <h2 className="font-bold">Recently published</h2>
+          <div className="mt-4 divide-y divide-slate-100">
+            {summary?.recent.length ? summary.recent.map((q, i) => (
+              <motion.div key={q.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="flex items-start gap-4 py-4">
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold/20 text-xs font-extrabold">{q.subject.charAt(0)}</span>
+                <div>
+                  <p className="font-semibold">{q.question}</p>
+                  <p className="mt-1 text-xs text-slate-500">{q.subject} · {q.grade} · {q.unit}</p>
+                </div>
+              </motion.div>
+            )) : <p className="py-10 text-center text-sm text-slate-500">{summary ? "No questions yet. Add the first question to make exams dynamic." : "Loading..."}</p>}
+          </div>
+        </section>
+      </div>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto bg-navy/50 p-4 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
+            <motion.form initial={{ opacity: 0, y: 30, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20 }} onSubmit={save} className="mx-auto my-6 max-w-2xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+              <div className="flex justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[.16em] text-royal">Question builder</p>
+                  <h2 className="mt-2 text-2xl font-extrabold">Publish a question</h2>
+                </div>
+                <button type="button" onClick={() => setOpen(false)} className="h-9 w-9 rounded-full hover:bg-slate-100" aria-label="Close"><X className="mx-auto" size={20} /></button>
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-bold">Subject<select value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{SUBJECTS.map((s) => <option key={s}>{s}</option>)}</select></label>
+                <label className="text-sm font-bold">Grade<select value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{GRADES.map((g) => <option key={g}>{g}</option>)}</select></label>
+                <label className="text-sm font-bold">Unit<input required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+                <label className="text-sm font-bold">Exam year<input required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+              </div>
+              <label className="mt-4 block text-sm font-bold">Question<textarea required value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {form.choices.map((choice, i) => (
+                  <label key={i} className="text-sm font-bold">
+                    <span className="flex items-center justify-between">Choice {String.fromCharCode(65 + i)}
+                      <button type="button" onClick={() => setForm({ ...form, correctAnswer: i })} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${form.correctAnswer === i ? "bg-green-100 text-green-700" : "text-slate-400 hover:bg-slate-100"}`}>{form.correctAnswer === i ? "✓ Correct" : "Mark correct"}</button>
+                    </span>
+                    <input required value={choice} onChange={(e) => setChoice(i, e.target.value)} className={`mt-2 w-full rounded-xl border p-3 font-normal ${form.correctAnswer === i ? "border-green-400 bg-green-50/50" : "border-slate-200"}`} />
+                  </label>
+                ))}
+              </div>
+              <label className="mt-4 block text-sm font-bold">Explanation<textarea required value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+              {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
+              <button disabled={saving} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-4 py-3.5 font-bold text-white hover:bg-royal disabled:opacity-70">
+                {saving ? <><LoaderCircle size={18} className="animate-spin" /> Publishing...</> : "Publish question"}
+              </button>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </main>
+  );
 }
