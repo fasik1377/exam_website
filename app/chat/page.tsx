@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, GraduationCap, Hash, LoaderCircle, MessageCircle, 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import AccountMenu from "@/app/components/AccountMenu";
 import Brand from "@/app/components/Brand";
 import { dashboardFor, useSession } from "@/app/components/useSession";
 import { SUBJECTS } from "@/lib/subjects";
@@ -119,7 +120,10 @@ function Shell({ back, children }: { back: string; children: React.ReactNode }) 
     <main className="flex min-h-dvh flex-col bg-[#f3f6fb] text-navy">
       <header className="flex h-[4.25rem] shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
         <Brand size="sm" />
-        <Link href={back} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"><ArrowLeft size={16} /> Dashboard</Link>
+        <div className="flex items-center gap-2">
+          <Link href={back} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"><ArrowLeft size={16} /> <span className="hidden sm:inline">Dashboard</span></Link>
+          <AccountMenu />
+        </div>
       </header>
       {children}
     </main>

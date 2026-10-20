@@ -5,7 +5,7 @@ import { getDb } from "@/lib/db";
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireUser();
+    const auth = await requireUser(["student"]);
     if (auth.error) return auth.error;
     const body = await readJson(request);
     const questionId = typeof body.questionId === "string" ? body.questionId : "";

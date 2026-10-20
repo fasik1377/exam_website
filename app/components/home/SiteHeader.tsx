@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import Brand from "@/app/components/Brand";
 import LogoutButton from "@/app/components/LogoutButton";
+import AccountMenu from "@/app/components/AccountMenu";
 import { dashboardFor, useSession } from "@/app/components/useSession";
 
 const LINKS = [
@@ -49,7 +50,7 @@ export default function SiteHeader() {
                 <span className="hidden lg:inline">{dashboardLabel}</span>
                 <LayoutDashboard size={16} className="lg:hidden" />
               </Link>
-              <LogoutButton compact tone={light ? "dark" : "light"} />
+              <AccountMenu tone={light ? "dark" : "light"} />
             </>
           ) : (
             <>

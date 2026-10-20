@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { ensureDatabase, hashPassword } from "@/lib/auth";
-import { notifyNewRegistration } from "@/lib/mail";
+import { notifyNewRegistration, notifyRegistrationReceived } from "@/lib/mail";
 import { apiError, cleanString, readJson } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { SUBJECTS } from "@/lib/subjects";
@@ -29,10 +29,13 @@ export async function POST(request: Request) {
       name, email, passwordHash: await hashPassword(password), role, status: "pending",
       plan: role === "admin" ? "teacher" : "free", ...(role === "admin" ? { subject } : {}), createdAt: now, updatedAt: now,
     });
-    // Email the platform owner(s) after responding, so registration stays fast.
+    // After responding (so registration stays fast): alert the platform owner, and confirm to the applicant.
     after(async () => {
       const admins = await db.collection<DbUser>("users").find({ role: "super-admin", status: "active" }, { projection: { email: 1 } }).toArray();
-      await notifyNewRegistration({ name, email, role, subject: role === "admin" ? subject : undefined }, admins.map((a) => a.email));
+      await Promise.all([
+        notifyNewRegistration({ name, email, role, subject: role === "admin" ? subject : undefined }, admins.map((a) => a.email)),
+        notifyRegistrationReceived({ name, email, role, subject: role === "admin" ? subject : null }),
+      ]);
     });
     return Response.json({ pending: true, role: role === "admin" ? "teacher" : "student" }, { status: 201 });
   } catch (error) { return apiError(error); }

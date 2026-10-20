@@ -11,7 +11,10 @@ export type SessionUser = {
   subject?: string;
 };
 
-type SessionState = { user: SessionUser | null; loading: boolean; unavailable: boolean };
+/** Why the visitor was signed out (e.g. their account signed in on another device). */
+export type SignedOutReason = "replaced" | "expired" | "inactive" | "signed-out-everywhere";
+
+type SessionState = { user: SessionUser | null; loading: boolean; unavailable: boolean; reason?: SignedOutReason };
 
 export function dashboardFor(role: SessionUser["role"]) {
   if (role === "super-admin") return "/super-admin";
@@ -23,7 +26,7 @@ async function fetchSession(): Promise<SessionState> {
   try {
     const response = await fetch("/api/auth/me", { cache: "no-store" });
     const data = await response.json();
-    return { user: data.user ?? null, loading: false, unavailable: Boolean(data.unavailable) };
+    return { user: data.user ?? null, loading: false, unavailable: Boolean(data.unavailable), reason: data.reason };
   } catch {
     return { user: null, loading: false, unavailable: false };
   }

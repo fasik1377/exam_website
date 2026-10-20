@@ -56,14 +56,14 @@ export async function PATCH(request: Request) {
     const objectIds = ids.map((id) => new ObjectId(id));
     // Applicants whose pending registration is being decided get an email about the outcome.
     const decided = status === "active" || status === "rejected"
-      ? await db.collection("users").find({ _id: { $in: objectIds }, status: "pending" }, { projection: { name: 1, email: 1 } }).toArray()
+      ? await db.collection("users").find({ _id: { $in: objectIds }, status: "pending" }, { projection: { name: 1, email: 1, role: 1 } }).toArray()
       : [];
     const result = await db.collection("users").updateMany(
       { _id: { $in: objectIds } },
       { $set: { status, updatedAt: new Date(), reviewedAt: new Date(), reviewedBy: new ObjectId(auth.user.id) } },
     );
     if (status !== "active") await db.collection("sessions").deleteMany({ userId: { $in: objectIds } });
-    if (decided.length) after(() => Promise.all(decided.map((u) => notifyDecision({ name: u.name, email: u.email }, status === "active"))));
+    if (decided.length) after(() => Promise.all(decided.map((u) => notifyDecision({ name: u.name, email: u.email, role: u.role }, status === "active"))));
     return Response.json({ ok: true, updated: result.modifiedCount });
   } catch (error) { return apiError(error); }
 }

@@ -4,7 +4,7 @@ import { ArrowRight, Atom, BookOpenText, CheckCircle2, Flame, Hash, MessageCircl
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Brand from "@/app/components/Brand";
-import LogoutButton from "@/app/components/LogoutButton";
+import AccountMenu from "@/app/components/AccountMenu";
 import { STREAMS, subjectsFor, type Stream } from "@/lib/subjects";
 
 type Summary = {
@@ -52,7 +52,7 @@ export default function StudentDashboard() {
               <MessageCircle size={17} /> <span className="hidden sm:inline">Messages</span>
               {!!data?.unread && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1 text-[10px] font-extrabold">{data.unread}</span>}
             </Link>
-            <LogoutButton />
+            <AccountMenu />
           </div>
         </div>
       </header>

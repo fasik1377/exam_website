@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       return Response.json({ error: `This is the ${PORTALS[portal].label.toLowerCase()} page. Your account signs in at ${right.label}.`, portal: right }, { status: 403 });
     }
     await db.collection("login_failures").deleteMany({ email });
-    await createSession(user._id!, user.role, Boolean(body.remember));
+    await createSession(user._id!, body.remember === true);
     await db.collection("users").updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
     return Response.json({ user: toPublicUser(user as DbUser & { _id: NonNullable<DbUser["_id"]> }), redirect: roleHome(user.role) });
   } catch (error) { return apiError(error); }

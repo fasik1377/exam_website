@@ -92,9 +92,49 @@ export function notifyNewRegistration(applicant: Applicant, adminEmails: string[
 }
 
 /** Tells an applicant that their account was approved or rejected. */
-export function notifyDecision(user: { name: string; email: string }, approved: boolean) {
-  const link = `${siteUrl()}/login`;
-  return approved
-    ? send(user.email, "Your እውቀትNET account is approved", layout("Welcome to እውቀትNET!", `Hi ${user.name}, your account has been approved. You can now sign in and start using the platform.`, [], { label: "Sign in now", href: link }), `Hi ${user.name}, your account has been approved. Sign in: ${link}`)
-    : send(user.email, "Your እውቀትNET registration", layout("Registration not approved", `Hi ${user.name}, unfortunately your registration was not approved. If you think this is a mistake, please reply to this email.`, []), `Hi ${user.name}, unfortunately your registration was not approved.`);
+type Applicant2 = { name: string; email: string; role: "student" | "admin" | string; subject?: string | null };
+const roleWord = (role: string) => (role === "admin" ? "teacher" : "student");
+const loginPath = (role: string) => (role === "admin" ? "/admin/login" : "/login");
+
+/** Sent to the applicant right after they register: received, now waiting for approval. */
+export function notifyRegistrationReceived(user: Applicant2) {
+  const rows: [string, string][] = [["Name", user.name], ["Email", user.email], ["Account type", roleWord(user.role) === "teacher" ? "Teacher" : "Student"]];
+  if (user.subject) rows.push(["Subject", user.subject]);
+  rows.push(["Status", "Waiting for approval"]);
+  return send(
+    user.email,
+    "We received your እውቀትNET registration",
+    layout(
+      "Registration received — waiting for approval",
+      `Hi ${user.name}, thank you for registering as a ${roleWord(user.role)} on እውቀትNET. A platform administrator will review your account shortly. You can't sign in yet — we'll email you again as soon as your account is approved.`,
+      rows,
+    ),
+    `Hi ${user.name}, we received your ${roleWord(user.role)} registration on እውቀትNET. Your account is waiting for approval; we'll email you when you can sign in.`,
+  );
+}
+
+/** Sent when the super admin approves (access granted) or rejects a registration. */
+export function notifyDecision(user: Applicant2, approved: boolean) {
+  const link = `${siteUrl()}${loginPath(user.role)}`;
+  if (approved) {
+    const teacher = roleWord(user.role) === "teacher";
+    const rows: [string, string][] = [
+      ["Account type", teacher ? "Teacher" : "Student"],
+      ["Sign in at", link],
+      ["Email", user.email],
+      ["You can now", teacher ? "Publish questions, upload exam files and answer students" : "Practise exams, see explanations and chat with teachers"],
+    ];
+    return send(
+      user.email,
+      "✅ Your እውቀትNET account is approved — you have access now",
+      layout("You have access now!", `Hi ${user.name}, good news — your ${roleWord(user.role)} account has been approved. Sign in with the email and password you registered with.`, rows, { label: teacher ? "Go to teacher login" : "Sign in and start practising", href: link }),
+      `Hi ${user.name}, your ${roleWord(user.role)} account on እውቀትNET has been approved. You have access now — sign in at ${link}`,
+    );
+  }
+  return send(
+    user.email,
+    "Your እውቀትNET registration",
+    layout("Registration not approved", `Hi ${user.name}, unfortunately your registration was not approved. If you think this is a mistake, please reply to this email.`, []),
+    `Hi ${user.name}, unfortunately your registration was not approved.`,
+  );
 }

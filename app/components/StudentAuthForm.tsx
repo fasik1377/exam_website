@@ -2,9 +2,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, BookOpen, Clock3, GraduationCap, KeyRound, Mail, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import AuthShell, { Field, FormError, SubmitButton } from "@/app/components/AuthShell";
-import { dashboardFor, useSession } from "@/app/components/useSession";
+import { SignedInCard } from "@/app/components/PortalLogin";
+import { useSession } from "@/app/components/useSession";
 import { SUBJECTS } from "@/lib/subjects";
 
 type Role = "student" | "teacher";
@@ -14,17 +15,13 @@ export default function StudentAuthForm({ mode, initialRole = "student" }: { mod
   const { user } = useSession();
   const [form, setForm] = useState({ name: "", email: "", password: "", subject: "" });
   const [role, setRole] = useState<Role>(initialRole);
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [pendingNotice, setPendingNotice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState<Role | null>(null);
   const signup = mode === "signup";
 
-  // Already signed in? Send them straight to where they belong.
-  useEffect(() => {
-    if (user) window.location.replace(dashboardFor(user.role));
-  }, [user]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -62,7 +59,13 @@ export default function StudentAuthForm({ mode, initialRole = "student" }: { mod
       points={["Natural & Social Science exam subjects", "Step-by-step teacher explanations", "Every account is reviewed and approved for safety"]}
     >
       <AnimatePresence mode="wait">
-        {submitted ? (
+        {user && !submitted ? (
+          <motion.div key="signed-in">
+            <h2 className="text-center text-2xl font-extrabold tracking-tight">You&apos;re signed in</h2>
+            <p className="mt-1 text-center text-sm text-slate-500">Sign out first to register a different account.</p>
+            <SignedInCard user={user} />
+          </motion.div>
+        ) : submitted ? (
           <PendingApproval key="done" role={submitted} email={form.email} />
         ) : (
           <motion.div key="form" exit={{ opacity: 0, y: -10 }}>

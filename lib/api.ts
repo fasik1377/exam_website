@@ -11,6 +11,11 @@ function isDatabaseError(error: unknown) {
 }
 
 export function apiError(error: unknown) {
+  // Two registrations with the same email at the same moment: the unique index rejects the second.
+  const duplicate = error as { code?: number; keyPattern?: Record<string, unknown> };
+  if (duplicate?.code === 11000 && duplicate.keyPattern && "email" in duplicate.keyPattern) {
+    return Response.json({ error: "An account with this email already exists" }, { status: 409 });
+  }
   console.error(error);
   if (isDatabaseError(error)) {
     return Response.json({ error: "The service is temporarily unavailable because the database cannot be reached. Please try again shortly." }, { status: 503 });

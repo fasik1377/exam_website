@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ROLE_COOKIE, SESSION_COOKIE, roleHome, verifyRole } from "@/lib/roleCookie";
-import type { UserRole } from "@/lib/types";
+import { SESSION_COOKIE, lookupSession, roleHome, type SessionEndReason } from "@/lib/session";
+import type { PublicUser, UserRole } from "@/lib/types";
 
 /**
- * Role-based route protection. Runs before every protected page:
- * - signed-out visitors go to the login page for that area (remembering where they were going);
+ * Role-based route protection, decided on the server before a protected page renders
+ * (so there is no flash-then-redirect). The session is checked against the database:
+ * - signed-out visitors go to that area's login page (remembering where they were going);
  * - signed-in users with the wrong role go to their own dashboard.
- * Every API route also checks the real database session, so this is the first of two locks.
+ * Every API route checks the session again, so data is protected even without this.
  */
 const AREAS: { prefix: string; roles: UserRole[]; login: string }[] = [
   { prefix: "/super-admin", roles: ["super-admin"], login: "/super-admin/login" },
@@ -15,22 +16,29 @@ const AREAS: { prefix: string; roles: UserRole[]; login: string }[] = [
   { prefix: "/chat", roles: ["student", "admin"], login: "/login" },
 ];
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const area = AREAS.find((a) => pathname === a.prefix || pathname.startsWith(`${a.prefix}/`));
-  // Login pages are always reachable; they decide on the client using the real session.
+  // Login pages always render; they show a "you're signed in" card instead of auto-forwarding.
   if (!area || pathname === area.login) return NextResponse.next();
 
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
-  const claim = hasSession ? verifyRole(request.cookies.get(ROLE_COOKIE)?.value) : null;
+  let user: PublicUser | null;
+  let reason: SessionEndReason | undefined;
+  try {
+    ({ user, reason } = await lookupSession(request.cookies.get(SESSION_COOKIE)?.value));
+  } catch {
+    // Database unreachable: let the page load and show its own "service unavailable" message.
+    return NextResponse.next();
+  }
 
-  if (!claim) {
+  if (!user) {
     const login = new URL(area.login, request.url);
     login.searchParams.set("next", pathname + search);
+    if (reason === "replaced" || reason === "signed-out-everywhere") login.searchParams.set("reason", reason);
     return NextResponse.redirect(login);
   }
-  if (!area.roles.includes(claim.role)) {
-    const home = new URL(roleHome(claim.role), request.url);
+  if (!area.roles.includes(user.role)) {
+    const home = new URL(roleHome(user.role), request.url);
     home.searchParams.set("denied", area.prefix.slice(1));
     return NextResponse.redirect(home);
   }

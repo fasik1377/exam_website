@@ -4,7 +4,7 @@ import { BookOpen, Check, CheckCircle2, FileUp, ListChecks, LoaderCircle, Messag
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Brand from "@/app/components/Brand";
-import LogoutButton from "@/app/components/LogoutButton";
+import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
 import { SUBJECTS as ALL_SUBJECTS } from "@/lib/subjects";
 import ImportDialog from "./ImportDialog";
@@ -94,8 +94,7 @@ export default function TeacherDashboard() {
                 {!!summary?.unreadMessages && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1 text-[10px] font-extrabold text-navy">{summary.unreadMessages}</span>}
               </Link>
             )}
-            {user && <span className="hidden text-sm font-semibold text-slate-500 md:inline">{user.name}</span>}
-            <LogoutButton />
+            <AccountMenu />
           </div>
         </div>
       </header>

@@ -2,9 +2,8 @@
 import { motion } from "framer-motion";
 import { ArrowRight, BookOpen, Clock3, GraduationCap, KeyRound, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import AuthShell, { Field, FormError, SubmitButton } from "@/app/components/AuthShell";
-import LogoutButton from "@/app/components/LogoutButton";
 import { dashboardFor, useSession, type SessionUser } from "@/app/components/useSession";
 
 export type Portal = "student" | "admin" | "super-admin";
@@ -43,19 +42,16 @@ function destination(portal: Portal) {
 
 export default function PortalLogin({ portal }: { portal: Portal }) {
   const config = PORTALS[portal];
-  const { user, loading: sessionLoading } = useSession();
+  const { user, loading: sessionLoading, reason: sessionReason } = useSession();
+  // Why the visitor was signed out: from the proxy redirect (?reason=) or the session check.
+  const reason = sessionReason ?? (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("reason") : null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [rightPortal, setRightPortal] = useState<{ label: string; path: string } | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // Already signed in with this portal's role? Go straight in.
-  useEffect(() => {
-    if (user && user.role === portal) window.location.replace(destination(portal));
-  }, [user, portal]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -85,8 +81,10 @@ export default function PortalLogin({ portal }: { portal: Portal }) {
     <AuthShell eyebrow={config.eyebrow} title={config.tagline} description="" points={config.points}>
       <PortalTabs current={portal} />
 
-      {!sessionLoading && user && user.role !== portal ? (
-        <SignedInElsewhere user={user} />
+      {sessionLoading ? (
+        <div className="mt-10 grid place-items-center py-10"><span className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-royal" /></div>
+      ) : user ? (
+        <SignedInCard user={user} />
       ) : (
         <>
           <div className="mt-6 text-center">
@@ -94,11 +92,17 @@ export default function PortalLogin({ portal }: { portal: Portal }) {
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight">{config.heading}</h2>
             <p className="mt-1.5 text-sm text-slate-500">{config.intro}</p>
           </div>
+          {(reason === "replaced" || reason === "signed-out-everywhere") && (
+            <p role="status" className="mt-5 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+              <ShieldCheck size={18} className="mt-0.5 shrink-0" />
+              {reason === "replaced" ? "You were signed out because your account signed in on another device. Only one device can be signed in at a time." : "You signed out of all devices. Sign in again to continue."}
+            </p>
+          )}
           <form onSubmit={submit} className="mt-6 grid gap-4">
             <Field label="Email" icon={<Mail size={17} />} required type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
             <Field label="Password" icon={<KeyRound size={17} />} required type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
             <div className="flex items-center justify-between gap-3 text-sm">
-              <label className="flex items-center gap-2 text-slate-600"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-royal" /> Keep me signed in</label>
+              <label className="flex items-center gap-2 text-slate-600"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-royal" /> Keep me signed in <span className="text-xs text-slate-400">(14 days)</span></label>
               <Link href={`/forgot-password?portal=${portal}`} className="font-semibold text-royal hover:underline">Forgot password?</Link>
             </div>
             {pending ? (
@@ -144,16 +148,25 @@ export function PortalTabs({ current }: { current?: Portal }) {
   );
 }
 
-function SignedInElsewhere({ user }: { user: SessionUser }) {
+/** Shown on login/sign-up pages when a session already exists — never auto-forwards. */
+export function SignedInCard({ user }: { user: SessionUser }) {
   const roleLabel = user.role === "super-admin" ? "platform admin" : user.role === "admin" ? "teacher" : "student";
+  const [busy, setBusy] = useState(false);
+  async function switchAccount() {
+    setBusy(true);
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    window.location.reload();
+  }
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
       <p className="text-sm text-slate-600">You&apos;re already signed in as</p>
       <p className="mt-1 font-extrabold">{user.name}</p>
       <p className="text-xs text-slate-500">{user.email} · {roleLabel}</p>
-      <div className="mt-4 flex flex-wrap justify-center gap-2">
-        <Link href={dashboardFor(user.role)} className="inline-flex items-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-sm font-bold text-white hover:bg-royal">Go to my dashboard <ArrowRight size={15} /></Link>
-        <LogoutButton />
+      <div className="mt-4 grid gap-2">
+        <Link href={dashboardFor(user.role)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-4 py-3 text-sm font-bold text-white hover:bg-royal">Continue to my dashboard <ArrowRight size={15} /></Link>
+        <button type="button" onClick={switchAccount} disabled={busy} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 hover:border-red-200 hover:text-red-700 disabled:opacity-60">
+          {busy ? "Signing out..." : "Sign out and use another account"}
+        </button>
       </div>
     </div>
   );

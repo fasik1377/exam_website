@@ -1,16 +1,17 @@
-import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "crypto";
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
-import { ROLE_COOKIE, SESSION_COOKIE, roleHome, signRole, verifyRole } from "@/lib/roleCookie";
+import { LEGACY_ROLE_COOKIE, SESSION_COOKIE, lookupSession, roleHome, tokenHash, toPublicUser, type SessionEndReason } from "@/lib/session";
 import type { DbUser, PublicUser, UserRole } from "@/lib/types";
 
 const scrypt = promisify(scryptCallback);
-export { SESSION_COOKIE, roleHome };
-const SESSION_DAYS = 14;
+export { SESSION_COOKIE, roleHome, toPublicUser };
+const REMEMBER_DAYS = 14;
+const SHORT_SESSION_HOURS = 12;
 
-const cookieOptions = (expires: Date) => ({ httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", expires });
+const baseCookie = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/" };
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -20,60 +21,61 @@ export async function hashPassword(password: string) {
 
 export async function verifyPassword(password: string, stored: string) {
   const [salt, key] = (stored || "").split(":");
-  if (!salt || !key) return false;
+  if (!salt || !key || !password) return false;
   const storedBuffer = Buffer.from(key, "hex");
   const derived = (await scrypt(password, salt, storedBuffer.length)) as Buffer;
   return storedBuffer.length === derived.length && timingSafeEqual(storedBuffer, derived);
 }
 
-const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
-
-export async function createSession(userId: ObjectId, role: UserRole, remember = false) {
+/**
+ * Starts a session. "Keep me signed in" → 14-day cookie; otherwise a browser-session cookie
+ * (gone when the browser closes) backed by a 12-hour server session.
+ */
+export async function createSession(userId: ObjectId, remember = false) {
   const db = await getDb();
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + (remember ? SESSION_DAYS : 1) * 86400000);
-  await db.collection("sessions").insertOne({ tokenHash: tokenHash(token), userId, expiresAt, createdAt: new Date() });
+  const expiresAt = new Date(Date.now() + (remember ? REMEMBER_DAYS * 24 : SHORT_SESSION_HOURS) * 3600000);
+  const now = new Date();
+  const created = await db.collection("sessions").insertOne({ tokenHash: tokenHash(token), userId, expiresAt, createdAt: now, revokedAt: null });
+  // One active login per account: signing in here signs out every other device.
+  // Revoked sessions are kept for a day so the other device can be told why it was signed out.
+  await db.collection("sessions").updateMany(
+    { userId, _id: { $ne: created.insertedId }, revokedAt: null },
+    { $set: { revokedAt: now, revokedReason: "replaced", expiresAt: new Date(now.getTime() + 86400000) } },
+  );
   const store = await cookies();
-  store.set(SESSION_COOKIE, token, cookieOptions(expiresAt));
-  store.set(ROLE_COOKIE, signRole({ uid: userId.toString(), role, exp: expiresAt.getTime() }), cookieOptions(expiresAt));
+  store.set(SESSION_COOKIE, token, remember ? { ...baseCookie, expires: expiresAt } : baseCookie);
+  store.delete({ name: LEGACY_ROLE_COOKIE, ...baseCookie });
 }
 
-/** Removes a role cookie that no longer matches a live session (signed out, banned, expired). */
-export async function clearRoleCookie() {
-  const store = await cookies();
-  if (store.get(ROLE_COOKIE)) store.delete(ROLE_COOKIE);
-}
-
-/** Re-issues the proxy's role cookie when it is missing or out of date (e.g. sessions from before it existed). */
-export async function syncRoleCookie(user: PublicUser) {
-  const store = await cookies();
-  const claim = verifyRole(store.get(ROLE_COOKIE)?.value);
-  if (claim?.uid === user.id && claim.role === user.role) return;
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400000);
-  store.set(ROLE_COOKIE, signRole({ uid: user.id, role: user.role, exp: expiresAt.getTime() }), cookieOptions(expiresAt));
-}
-
-export async function deleteSession() {
+/** Signs out this browser — or, with `everywhere`, every device the account is signed in on. */
+export async function deleteSession(everywhere = false) {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
-  if (token) await getDb().then((db) => db.collection("sessions").deleteOne({ tokenHash: tokenHash(token) })).catch(() => undefined);
-  store.delete(SESSION_COOKIE);
-  store.delete(ROLE_COOKIE);
+  if (token) {
+    await getDb().then(async (db) => {
+      const session = await db.collection("sessions").findOne({ tokenHash: tokenHash(token) });
+      await db.collection("sessions").deleteOne({ tokenHash: tokenHash(token) });
+      if (everywhere && session) {
+        await db.collection("sessions").updateMany(
+          { userId: session.userId, revokedAt: null },
+          { $set: { revokedAt: new Date(), revokedReason: "signed-out-everywhere", expiresAt: new Date(Date.now() + 86400000) } },
+        );
+      }
+    }).catch(() => undefined);
+  }
+  // Delete with the same attributes the cookies were created with, so every browser removes them.
+  store.delete({ name: SESSION_COOKIE, ...baseCookie });
+  store.delete({ name: LEGACY_ROLE_COOKIE, ...baseCookie });
 }
 
-export function toPublicUser(user: DbUser & { _id: ObjectId }): PublicUser {
-  return { id: user._id.toString(), name: user.name, email: user.email, role: user.role, status: user.status, plan: user.plan, subject: user.subject };
+/** Current user plus, when signed out, the reason (e.g. signed in on another device). */
+export async function getSessionState(): Promise<{ user: PublicUser | null; reason?: SessionEndReason }> {
+  return lookupSession((await cookies()).get(SESSION_COOKIE)?.value);
 }
 
 export async function getCurrentUser(): Promise<PublicUser | null> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  const db = await getDb();
-  const session = await db.collection("sessions").findOne({ tokenHash: tokenHash(token), expiresAt: { $gt: new Date() } });
-  if (!session) return null;
-  const user = await db.collection<DbUser>("users").findOne({ _id: session.userId as ObjectId });
-  if (!user || user.status !== "active") return null;
-  return toPublicUser(user as DbUser & { _id: ObjectId });
+  return (await lookupSession((await cookies()).get(SESSION_COOKIE)?.value)).user;
 }
 
 export async function requireUser(roles?: UserRole[]) {
@@ -109,49 +111,29 @@ async function setupDatabase() {
     db.collection("password_resets").createIndex({ tokenHash: 1 }, { unique: true }),
     db.collection("password_resets").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);
-  await bootstrapUser("super-admin", "SUPER_ADMIN");
-  await bootstrapUser("admin", "ADMIN");
-  await seedQuestions();
+  await bootstrapSuperAdmin();
 }
 
-// Development-only fallbacks so a fresh local checkout can sign in. Production must set the env vars.
-const DEV_DEFAULTS = {
-  SUPER_ADMIN: { email: "superadmin@temarinet.local", password: "TemariNet#2026!", name: "TemariNet Super Admin" },
-  ADMIN: { email: "teacher@temarinet.local", password: "TemariNet#Teacher2026!", name: "TemariNet Teacher" },
-};
-
-async function bootstrapUser(role: UserRole, prefix: "ADMIN" | "SUPER_ADMIN") {
-  const fallback = process.env.NODE_ENV === "production" ? undefined : DEV_DEFAULTS[prefix];
-  const email = (process.env[`${prefix}_EMAIL`] || fallback?.email || "").trim().toLowerCase();
-  const password = process.env[`${prefix}_PASSWORD`] || fallback?.password || "";
-  const name = (process.env[`${prefix}_NAME`] || fallback?.name || "").trim() || email;
+/**
+ * The platform owner's account comes only from SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD.
+ * Teachers and students register themselves and are approved by the super admin.
+ */
+async function bootstrapSuperAdmin() {
+  const email = (process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase();
+  const password = process.env.SUPER_ADMIN_PASSWORD || "";
+  const name = (process.env.SUPER_ADMIN_NAME || "").trim() || "Platform Administrator";
   if (!email || !password) return;
 
   const db = await getDb();
   const existing = await db.collection<DbUser>("users").findOne({ email });
   if (!existing) {
     const now = new Date();
-    await db.collection<DbUser>("users").insertOne({ name, email, passwordHash: await hashPassword(password), role, status: "active", plan: "teacher", createdAt: now, updatedAt: now });
+    await db.collection<DbUser>("users").insertOne({ name, email, passwordHash: await hashPassword(password), role: "super-admin", status: "active", plan: "teacher", createdAt: now, updatedAt: now });
     return;
   }
-  // The environment is the source of truth for bootstrap accounts: keep the password in sync,
-  // and never let the platform owner be locked out of their own account.
+  // The environment is the source of truth: keep the password in sync and never lock the owner out.
   const update: Partial<DbUser> = {};
   if (!(await verifyPassword(password, existing.passwordHash))) update.passwordHash = await hashPassword(password);
-  if (role === "super-admin" && (existing.role !== role || existing.status !== "active")) Object.assign(update, { role, status: "active" });
+  if (existing.role !== "super-admin" || existing.status !== "active") Object.assign(update, { role: "super-admin", status: "active" });
   if (Object.keys(update).length) await db.collection<DbUser>("users").updateOne({ _id: existing._id }, { $set: { ...update, updatedAt: new Date() } });
-}
-
-async function seedQuestions() {
-  const db = await getDb();
-  if (await db.collection("questions").countDocuments()) return;
-  const teacher = await db.collection<DbUser>("users").findOne({ role: "admin" });
-  if (!teacher?._id) return;
-  const now = new Date();
-  const base = { subject: "Mathematics", grade: "Grade 12", unit: "Unit 1: Algebra", year: "2016 E.C.", teacherName: teacher.name, createdBy: teacher._id, published: true, createdAt: now, updatedAt: now };
-  await db.collection("questions").insertMany([
-    { ...base, prompt: "What is the value of x if 3x + 6 = 21?", choices: ["x = 3", "x = 5", "x = 7", "x = 9"], correctAnswer: 1, explanation: "Subtract 6 from both sides to get 3x = 15, then divide by 3. Therefore x = 5." },
-    { ...base, prompt: "The square root of 144 is:", choices: ["10", "11", "12", "14"], correctAnswer: 2, explanation: "12 multiplied by 12 equals 144, so the square root of 144 is 12." },
-    { ...base, prompt: "If 2(x + 4) = 18, what is x?", choices: ["3", "5", "7", "9"], correctAnswer: 1, explanation: "Divide both sides by 2 to get x + 4 = 9, then subtract 4. Thus x = 5." },
-  ]);
 }

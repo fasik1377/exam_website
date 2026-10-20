@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Brand from "@/app/components/Brand";
-import LogoutButton from "@/app/components/LogoutButton";
+import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
 import { SUBJECTS } from "@/lib/subjects";
 import { AccuracyBars, DailyStacked, Heatmap, Meter, SERIES, STATUS, Sparkline, StackedBar, SubjectBars, TrendChart } from "./charts";
@@ -155,19 +155,16 @@ function SuperAdmin() {
           {nav.map((item) => <NavButton key={item.id} item={item} active={section === item.id} onClick={() => setSection(item.id)} />)}
           <Link href="/admin" className="mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/60 hover:bg-white/5 hover:text-white"><BookOpen size={18} /> Question bank</Link>
         </nav>
-        <div className="relative mt-auto rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-gold font-extrabold text-navy">{user?.name.charAt(0).toUpperCase() ?? "A"}</span>
-            <div className="min-w-0"><p className="truncate text-sm font-bold">{user?.name ?? "Administrator"}</p><p className="truncate text-xs text-white/50">{user?.email}</p></div>
-          </div>
-          <div className="mt-3"><LogoutButton tone="light" /></div>
+        <div className="relative mt-auto">
+          <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-white/40">Signed in</p>
+          <AccountMenu tone="light" align="up" />
         </div>
       </aside>
 
       <div className="min-w-0">
         {/* Mobile top bar */}
         <header className="sticky top-0 z-30 bg-navy text-white lg:hidden">
-          <div className="flex items-center justify-between px-4 py-3"><Brand tone="light" size="sm" /><LogoutButton tone="light" compact /></div>
+          <div className="flex items-center justify-between px-4 py-3"><Brand tone="light" size="sm" /><AccountMenu tone="light" /></div>
           <div className="flex gap-1 overflow-x-auto px-3 pb-3">
             {nav.map((item) => (
               <button key={item.id} onClick={() => setSection(item.id)} className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${section === item.id ? "bg-white text-navy" : "text-white/70"}`}>
