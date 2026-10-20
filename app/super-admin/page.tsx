@@ -2,7 +2,7 @@
 import { AnimatePresence, animate, motion } from "framer-motion";
 import {
   AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, LayoutDashboard, LoaderCircle,
-  MessageCircle, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
+  KeyRound, Mail, MessageCircle, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -123,6 +123,14 @@ function SuperAdmin() {
     reload();
   }
 
+  async function setPassword(account: Account) {
+    const password = window.prompt(`New password for ${account.name} (at least 8 characters). They will be signed out and must use this password.`);
+    if (!password) return;
+    const response = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: account.id, password }) }).catch(() => null);
+    const data = await response?.json().catch(() => ({}));
+    setToast(response?.ok ? { ok: true, text: `Password updated for ${account.name}. Share it with them securely.` } : { ok: false, text: data?.error || "Could not update the password." });
+  }
+
   async function setSubject(id: string, subject: string) {
     const response = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, subject }) }).catch(() => null);
     const data = await response?.json().catch(() => ({}));
@@ -182,7 +190,7 @@ function SuperAdmin() {
             <motion.div key={section} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
               {section === "overview" && <OverviewSection name={user?.name} users={users} overview={overview} pending={pending} busy={busy} onDecide={setStatus} goTo={setSection} updatedAt={updatedAt} />}
               {section === "approvals" && <ApprovalsSection pending={pending} busy={busy} onDecide={setStatus} />}
-              {section === "users" && <UsersSection users={users} me={me} busy={busy} onDecide={setStatus} onSubject={setSubject} />}
+              {section === "users" && <UsersSection users={users} me={me} busy={busy} onDecide={setStatus} onSubject={setSubject} onPassword={setPassword} />}
               {section === "staff" && <StaffSection onCreated={(text) => { setToast({ ok: true, text }); reload(); }} onError={(text) => setToast({ ok: false, text })} />}
             </motion.div>
           </AnimatePresence>
@@ -302,6 +310,8 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo,
           </motion.div>
         ))}
       </div>
+
+      <EmailCard />
 
       {/* Trend + composition */}
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
@@ -431,9 +441,9 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo,
             )) : <li className="text-sm text-slate-500">No questions yet.</li>}
           </ul>
         </Panel>
-        <Panel title="Teacher support chat" subtitle="Student ↔ teacher conversations">
+        <Panel title="Chat activity" subtitle="Private chats and study-room messages">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-blue-50 p-4"><MessageCircle size={18} className="text-royal" /><p className="mt-2 text-3xl font-extrabold tabular-nums"><Counter value={overview?.chat.conversations ?? 0} /></p><p className="text-xs font-semibold text-slate-500">Conversations</p></div>
+            <div className="rounded-2xl bg-blue-50 p-4"><MessageCircle size={18} className="text-royal" /><p className="mt-2 text-3xl font-extrabold tabular-nums"><Counter value={overview?.chat.conversations ?? 0} /></p><p className="text-xs font-semibold text-slate-500">Private chats</p></div>
             <div className="rounded-2xl bg-amber-50 p-4"><Send size={18} className="text-amber-600" /><p className="mt-2 text-3xl font-extrabold tabular-nums"><Counter value={overview?.chat.messages ?? 0} /></p><p className="text-xs font-semibold text-slate-500">Messages</p></div>
           </div>
           <div className="mt-4">{overview && <Sparkline values={spark(overview.messages)} />}</div>
@@ -490,6 +500,45 @@ function TeachersBySubject({ users }: { users: Account[] }) {
         </motion.div>
       ))}
     </div>
+  );
+}
+
+function EmailCard() {
+  const [status, setStatus] = useState<{ configured: boolean; to: string; from: string } | null>(null);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/email", { cache: "no-store" }).then((r) => r.json()).then((d) => active && setStatus(d)).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  async function test() {
+    setSending(true);
+    setResult(null);
+    const response = await fetch("/api/admin/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
+    const data = await response?.json().catch(() => ({}));
+    setSending(false);
+    setResult(response?.ok ? { ok: true, text: `Test email sent to ${data.to}. Check the inbox (and spam folder).` } : { ok: false, text: data?.error || "Could not send the test email." });
+  }
+
+  return (
+    <section className={`flex flex-wrap items-center gap-4 rounded-3xl border p-5 ${status?.configured ? "border-slate-200 bg-white" : "border-amber-300 bg-amber-50"}`}>
+      <span className={`grid h-11 w-11 place-items-center rounded-2xl ${status?.configured ? "bg-green-50 text-green-600" : "bg-amber-100 text-amber-700"}`}><Mail size={20} /></span>
+      <div className="min-w-0 flex-1">
+        <p className="font-bold">Email notifications {status && (status.configured ? <span className="ml-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700">Configured</span> : <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">Not set up</span>)}</p>
+        <p className="text-sm text-slate-600">
+          {status?.configured
+            ? <>New registrations are emailed to <b>{status.to}</b>.</>
+            : <>Add <code className="rounded bg-white px-1">SMTP_PASS</code> (a Gmail App Password) to the environment so registrations are emailed to <b>{status?.to || "you"}</b>.</>}
+        </p>
+        {result && <p className={`mt-1 text-sm font-semibold ${result.ok ? "text-green-700" : "text-red-700"}`}>{result.text}</p>}
+      </div>
+      <button onClick={test} disabled={sending} className="inline-flex items-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-sm font-bold text-white hover:bg-royal disabled:opacity-60">
+        {sending ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />} Send test email
+      </button>
+    </section>
   );
 }
 
@@ -586,7 +635,7 @@ function AllCaughtUp() {
 
 /* ---------------- Users ---------------- */
 
-function UsersSection({ users, me, busy, onDecide, onSubject }: { users: Account[]; me: string; busy: string[]; onDecide: (ids: string[], status: Status, verb: string) => void; onSubject: (id: string, subject: string) => void }) {
+function UsersSection({ users, me, busy, onDecide, onSubject, onPassword }: { users: Account[]; me: string; busy: string[]; onDecide: (ids: string[], status: Status, verb: string) => void; onSubject: (id: string, subject: string) => void; onPassword: (user: Account) => void }) {
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
   const [status, setStatus] = useState<"all" | Status>("all");
@@ -654,10 +703,13 @@ function UsersSection({ users, me, busy, onDecide, onSubject }: { users: Account
                           <button disabled={busy.includes(u.id)} onClick={() => onDecide([u.id], "rejected", "rejected")} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-60">Reject</button>
                         </div>
                       ) : (
-                        <select disabled={busy.includes(u.id)} value={u.status} onChange={(e) => onDecide([u.id], e.target.value as Status, "updated")} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold disabled:opacity-60">
-                          <option value="active">Active</option><option value="restricted">Restricted</option><option value="banned">Banned</option>
-                          {u.status === "rejected" && <option value="rejected">Rejected</option>}
-                        </select>
+                        <div className="inline-flex items-center gap-1.5">
+                          <button title="Set a new password" onClick={() => onPassword(u)} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:border-royal hover:text-royal"><KeyRound size={14} /></button>
+                          <select disabled={busy.includes(u.id)} value={u.status} onChange={(e) => onDecide([u.id], e.target.value as Status, "updated")} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold disabled:opacity-60">
+                            <option value="active">Active</option><option value="restricted">Restricted</option><option value="banned">Banned</option>
+                            {u.status === "rejected" && <option value="rejected">Rejected</option>}
+                          </select>
+                        </div>
                       )}
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { totalUnread } from "@/lib/chat";
 import { apiError } from "@/lib/api";
 
 export async function GET() {
@@ -15,10 +16,10 @@ export async function GET() {
       db.collection("users").countDocuments({ role: "student", status: "active" }),
       db.collection("attempts").countDocuments(),
       db.collection("questions").find().sort({ createdAt: -1 }).limit(8).toArray(),
-      db.collection("conversations").aggregate<{ total: number }>([{ $match: { teacherId: me } }, { $group: { _id: null, total: { $sum: "$unreadTeacher" } } }]).toArray(),
+      totalUnread(auth.user),
     ]);
     return Response.json({
-      questions, myQuestions: mine, students, attempts, unreadMessages: unread[0]?.total ?? 0,
+      questions, myQuestions: mine, students, attempts, unreadMessages: unread,
       recent: recent.map((q) => ({ id: q._id.toString(), question: q.prompt, subject: q.subject, grade: q.grade, unit: q.unit })),
     });
   } catch (error) { return apiError(error); }

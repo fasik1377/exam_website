@@ -10,10 +10,10 @@ import { SUBJECTS } from "@/lib/subjects";
 type Role = "student" | "teacher";
 
 /** General sign-in (every role is routed to its own dashboard) and student/teacher registration. */
-export default function StudentAuthForm({ mode }: { mode: "login" | "signup" }) {
+export default function StudentAuthForm({ mode, initialRole = "student" }: { mode: "login" | "signup"; initialRole?: Role }) {
   const { user } = useSession();
   const [form, setForm] = useState({ name: "", email: "", password: "", subject: "" });
-  const [role, setRole] = useState<Role>("student");
+  const [role, setRole] = useState<Role>(initialRole);
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [pendingNotice, setPendingNotice] = useState(false);
@@ -45,7 +45,7 @@ export default function StudentAuthForm({ mode }: { mode: "login" | "signup" }) 
         return;
       }
       if (signup) return setSubmitted(role);
-      window.location.assign(data.redirect || "/#grades");
+      window.location.assign(data.redirect || "/student");
     } catch {
       setError("Network error — check your connection and try again.");
       setLoading(false);
@@ -117,7 +117,7 @@ export default function StudentAuthForm({ mode }: { mode: "login" | "signup" }) 
 
             <p className="mt-6 text-center text-sm text-slate-500">
               {signup ? "Already registered?" : "New to እውቀትNET?"}{" "}
-              <Link className="font-bold text-royal hover:underline" href={signup ? "/login" : "/signup"}>{signup ? "Sign in" : "Create an account"}</Link>
+              <Link className="font-bold text-royal hover:underline" href={signup ? (role === "teacher" ? "/admin/login" : "/login") : "/signup"}>{signup ? "Sign in" : "Create an account"}</Link>
             </p>
             {!signup && (
               <p className="mt-3 text-center text-xs text-slate-400">

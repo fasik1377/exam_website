@@ -1,8 +1,11 @@
-import { getCurrentUser } from "@/lib/auth";
+import { clearRoleCookie, getCurrentUser, syncRoleCookie } from "@/lib/auth";
 
 export async function GET() {
   try {
-    return Response.json({ user: await getCurrentUser() });
+    const user = await getCurrentUser();
+    if (user) await syncRoleCookie(user);
+    else await clearRoleCookie();
+    return Response.json({ user });
   } catch (error) {
     // Treat an unreachable database as "signed out" so public pages keep working.
     console.error(error);

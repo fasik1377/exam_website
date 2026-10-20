@@ -16,6 +16,7 @@ export const SUBJECTS: Subject[] = [
   { name: "Biology", amharic: "ባዮሎጂ", streams: ["natural"] },
   { name: "History", amharic: "ታሪክ", streams: ["social"] },
   { name: "Geography", amharic: "ጂኦግራፊ", streams: ["social"] },
+  { name: "Economics", amharic: "ኢኮኖሚክስ", streams: ["social"] },
 ];
 
 export const STREAMS: { id: Stream; label: string; amharic: string }[] = [

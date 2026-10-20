@@ -16,7 +16,7 @@ type SessionState = { user: SessionUser | null; loading: boolean; unavailable: b
 export function dashboardFor(role: SessionUser["role"]) {
   if (role === "super-admin") return "/super-admin";
   if (role === "admin") return "/admin";
-  return "/#grades";
+  return "/student";
 }
 
 async function fetchSession(): Promise<SessionState> {

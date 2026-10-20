@@ -1,2 +1,5 @@
-import StudentAuthForm from "@/app/components/StudentAuthForm";
-export default function LoginPage(){return <StudentAuthForm mode="login"/>}
+import PortalLogin from "@/app/components/PortalLogin";
+
+export default function StudentLoginPage() {
+  return <PortalLogin portal="student" />;
+}

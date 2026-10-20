@@ -3,17 +3,14 @@ import { promisify } from "util";
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
+import { ROLE_COOKIE, SESSION_COOKIE, roleHome, signRole, verifyRole } from "@/lib/roleCookie";
 import type { DbUser, PublicUser, UserRole } from "@/lib/types";
 
 const scrypt = promisify(scryptCallback);
-export const SESSION_COOKIE = "temarinet_session";
+export { SESSION_COOKIE, roleHome };
 const SESSION_DAYS = 14;
 
-export function roleHome(role: UserRole) {
-  if (role === "super-admin") return "/super-admin";
-  if (role === "admin") return "/admin";
-  return "/#grades";
-}
+const cookieOptions = (expires: Date) => ({ httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", expires });
 
 export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -31,13 +28,29 @@ export async function verifyPassword(password: string, stored: string) {
 
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 
-export async function createSession(userId: ObjectId, remember = false) {
+export async function createSession(userId: ObjectId, role: UserRole, remember = false) {
   const db = await getDb();
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + (remember ? SESSION_DAYS : 1) * 86400000);
   await db.collection("sessions").insertOne({ tokenHash: tokenHash(token), userId, expiresAt, createdAt: new Date() });
   const store = await cookies();
-  store.set(SESSION_COOKIE, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", expires: expiresAt });
+  store.set(SESSION_COOKIE, token, cookieOptions(expiresAt));
+  store.set(ROLE_COOKIE, signRole({ uid: userId.toString(), role, exp: expiresAt.getTime() }), cookieOptions(expiresAt));
+}
+
+/** Removes a role cookie that no longer matches a live session (signed out, banned, expired). */
+export async function clearRoleCookie() {
+  const store = await cookies();
+  if (store.get(ROLE_COOKIE)) store.delete(ROLE_COOKIE);
+}
+
+/** Re-issues the proxy's role cookie when it is missing or out of date (e.g. sessions from before it existed). */
+export async function syncRoleCookie(user: PublicUser) {
+  const store = await cookies();
+  const claim = verifyRole(store.get(ROLE_COOKIE)?.value);
+  if (claim?.uid === user.id && claim.role === user.role) return;
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400000);
+  store.set(ROLE_COOKIE, signRole({ uid: user.id, role: user.role, exp: expiresAt.getTime() }), cookieOptions(expiresAt));
 }
 
 export async function deleteSession() {
@@ -45,6 +58,7 @@ export async function deleteSession() {
   const token = store.get(SESSION_COOKIE)?.value;
   if (token) await getDb().then((db) => db.collection("sessions").deleteOne({ tokenHash: tokenHash(token) })).catch(() => undefined);
   store.delete(SESSION_COOKIE);
+  store.delete(ROLE_COOKIE);
 }
 
 export function toPublicUser(user: DbUser & { _id: ObjectId }): PublicUser {
@@ -90,9 +104,10 @@ async function setupDatabase() {
     db.collection("sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("questions").createIndex({ grade: 1, subject: 1, published: 1 }),
     db.collection("attempts").createIndex({ userId: 1, createdAt: -1 }),
-    db.collection("conversations").createIndex({ studentId: 1, teacherId: 1 }, { unique: true }),
-    db.collection("conversations").createIndex({ teacherId: 1, lastMessageAt: -1 }),
-    db.collection("messages").createIndex({ conversationId: 1, createdAt: -1 }),
+    db.collection("login_failures").createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 }),
+    db.collection("login_failures").createIndex({ email: 1, createdAt: -1 }),
+    db.collection("password_resets").createIndex({ tokenHash: 1 }, { unique: true }),
+    db.collection("password_resets").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);
   await bootstrapUser("super-admin", "SUPER_ADMIN");
   await bootstrapUser("admin", "ADMIN");

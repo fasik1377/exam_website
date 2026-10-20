@@ -33,20 +33,42 @@ function layout(title: string, intro: string, rows: [string, string][], button?:
   </div></body></html>`;
 }
 
-async function send(to: string, subject: string, html: string, text: string) {
+export type MailResult = { ok: boolean; error?: string };
+
+async function send(to: string, subject: string, html: string, text: string): Promise<MailResult> {
   const mailer = transporter();
   if (!mailer) {
     console.info(`[mail] SMTP not configured — skipped "${subject}" to ${to}`);
-    return false;
+    return { ok: false, error: "Email is not configured: set SMTP_HOST, SMTP_USER and SMTP_PASS." };
   }
   try {
     await mailer.sendMail({ from: process.env.MAIL_FROM || process.env.SMTP_USER, to, subject, html, text });
-    return true;
+    return { ok: true };
   } catch (error) {
     // Email must never break the request that triggered it.
     console.error("[mail] send failed", error);
-    return false;
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: /535|Username and Password not accepted|Invalid login/i.test(message) ? "Gmail rejected the login — SMTP_PASS must be a 16-character Google App Password, not your normal password." : message };
   }
+}
+
+/** Address that receives "new registration" alerts. */
+export const notifyAddress = () => process.env.NOTIFY_EMAIL || process.env.SUPER_ADMIN_EMAIL || "";
+
+/** Whether sending is configured, without revealing secrets. */
+export function mailStatus() {
+  return { configured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS), from: process.env.MAIL_FROM || process.env.SMTP_USER || "", to: notifyAddress() };
+}
+
+/** Sends a test message so the super admin can confirm notifications work. */
+export function sendTestEmail(to: string) {
+  return send(to, "እውቀትNET test email ✔", layout("Email notifications are working", "This test confirms that እውቀትNET can send you emails about new registrations.", [["Sent", new Date().toUTCString()]]), "Email notifications are working.");
+}
+
+/** Password-reset link (valid for 1 hour). */
+export function notifyPasswordReset(user: { name: string; email: string }, token: string) {
+  const link = `${siteUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+  return send(user.email, "Reset your እውቀትNET password", layout("Reset your password", `Hi ${user.name}, we received a request to reset your password. The link below works for 1 hour. If you didn't ask for this, you can ignore this email.`, [], { label: "Choose a new password", href: link }), `Reset your password (valid for 1 hour): ${link}`);
 }
 
 type Applicant = { name: string; email: string; role: "student" | "admin"; subject?: string };
@@ -55,8 +77,8 @@ type Applicant = { name: string; email: string; role: "student" | "admin"; subje
 export function notifyNewRegistration(applicant: Applicant, adminEmails: string[]) {
   const roleLabel = applicant.role === "admin" ? "Teacher" : "Student";
   // The owner's address from the environment; other super-admin accounts only as a last resort.
-  const to = process.env.NOTIFY_EMAIL || process.env.SUPER_ADMIN_EMAIL || adminEmails.join(", ");
-  if (!to) return Promise.resolve(false);
+  const to = notifyAddress() || adminEmails.join(", ");
+  if (!to) return Promise.resolve({ ok: false, error: "No notification address" });
   const rows: [string, string][] = [["Name", applicant.name], ["Email", applicant.email], ["Role", roleLabel]];
   if (applicant.subject) rows.push(["Subject", applicant.subject]);
   rows.push(["Registered", new Date().toUTCString()]);

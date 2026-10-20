@@ -28,7 +28,7 @@ export async function GET() {
       perDay("users", { role: "student" }),
       perDay("users", { role: "admin" }),
       perDay("attempts"),
-      perDay("messages"),
+      perDay("chat_messages"),
       perDay("questions"),
       db.collection("attempts").aggregate<{ total: number; correct: number }>([{ $group: { _id: null, total: { $sum: 1 }, correct: { $sum: { $cond: ["$correct", 1, 0] } } } }]).toArray(),
       db.collection("questions").aggregate<DayRow>([{ $group: { _id: "$subject", count: { $sum: 1 } } }, { $sort: { count: -1 } }]).toArray(),
@@ -58,8 +58,8 @@ export async function GET() {
         { $match: { wait: { $gt: 1000 } } },
         { $group: { _id: "$outcome", count: { $sum: 1 }, avgMs: { $avg: "$wait" } } },
       ]).toArray(),
-      db.collection("conversations").countDocuments(),
-      db.collection("messages").countDocuments(),
+      db.collection("chats").countDocuments({ kind: "direct" }),
+      db.collection("chat_messages").countDocuments({ deletedAt: null }),
     ]);
 
     const keys = Array.from({ length: DAYS }, (_, i) => {

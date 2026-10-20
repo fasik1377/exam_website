@@ -62,7 +62,7 @@ export default function Home() {
           <Reveal className="min-w-0">
             <SectionLabel>Try it now — no account needed</SectionLabel>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Answer a question from every subject.</h2>
-            <p className="mt-4 max-w-md leading-7 text-slate-500">From Geography and History to Physics and Scholastic Aptitude — test yourself, build a streak, and see the explanation behind every answer.</p>
+            <p className="mt-4 max-w-md leading-7 text-slate-500">From Geography, History and Economics to Physics and Scholastic Aptitude — test yourself, build a streak, and see the explanation behind every answer.</p>
             <ul className="mt-6 grid gap-3 text-sm font-semibold text-slate-600">
               {["Instant right-or-wrong feedback", "A short explanation for every answer", "Questions from both Natural and Social Science"].map((t) => (
                 <li key={t} className="flex items-center gap-2"><CheckCircle2 size={17} className="text-royal" />{t}</li>

@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Atom, BookOpenText, Brain, Calculator, Dna, FlaskConical, Globe2, Languages, Landmark, type LucideIcon } from "lucide-react";
+import { ArrowRight, Atom, BookOpenText, Brain, Calculator, Dna, FlaskConical, Globe2, Languages, Landmark, TrendingUp, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { STREAMS, isCommon, subjectsFor, type Stream } from "@/lib/subjects";
@@ -21,6 +21,7 @@ const STYLE: Record<string, { icon: LucideIcon; tint: string; color: string }> =
   Biology: { icon: Dna, tint: "from-emerald-500/15", color: "text-emerald-600 bg-emerald-50" },
   History: { icon: Landmark, tint: "from-amber-500/15", color: "text-amber-700 bg-amber-50" },
   Geography: { icon: Globe2, tint: "from-teal-500/15", color: "text-teal-600 bg-teal-50" },
+  Economics: { icon: TrendingUp, tint: "from-indigo-500/15", color: "text-indigo-600 bg-indigo-50" },
 };
 
 const STREAM_ICON: Record<Stream, LucideIcon> = { natural: Atom, social: BookOpenText };

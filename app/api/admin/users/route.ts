@@ -27,6 +27,17 @@ export async function PATCH(request: Request) {
   try {
     const auth = await requireUser(["super-admin"]); if (auth.error) return auth.error;
     const body = await readJson(request);
+    // Setting a new password for a user (e.g. they forgot it and email isn't available).
+    if (body.password !== undefined) {
+      const id = cleanString(body.id, 40);
+      const password = typeof body.password === "string" ? body.password : "";
+      if (!ObjectId.isValid(id) || password.length < 8) return Response.json({ error: "Use a password of at least 8 characters" }, { status: 400 });
+      const db = await getDb();
+      const result = await db.collection("users").updateOne({ _id: new ObjectId(id) }, { $set: { passwordHash: await hashPassword(password), updatedAt: new Date() } });
+      if (!result.matchedCount) return Response.json({ error: "User not found" }, { status: 404 });
+      if (id !== auth.user.id) await db.collection("sessions").deleteMany({ userId: new ObjectId(id) });
+      return Response.json({ ok: true });
+    }
     // Assigning a teacher's subject is a separate, single-account update.
     if (body.subject !== undefined) {
       const id = cleanString(body.id, 40);
@@ -34,7 +45,6 @@ export async function PATCH(request: Request) {
       const db = await getDb();
       const result = await db.collection("users").updateOne({ _id: new ObjectId(id), role: "admin" }, { $set: { subject: body.subject, updatedAt: new Date() } });
       if (!result.matchedCount) return Response.json({ error: "Teacher not found" }, { status: 404 });
-      await db.collection("conversations").updateMany({ teacherId: new ObjectId(id) }, { $set: { subject: body.subject } });
       return Response.json({ ok: true });
     }
     const status = cleanString(body.status, 20) as UserStatus;
