@@ -14,13 +14,16 @@ export type DbUser = {
   plan: "free" | "monthly" | "yearly" | "teacher";
   /** Subject a teacher applied to teach. */
   subject?: string;
+  /** Student grade ("Grade 9" … "Grade 12") and, for Grades 11–12, stream. */
+  grade?: string;
+  stream?: "natural" | "social" | null;
   reviewedAt?: Date;
   reviewedBy?: ObjectId;
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type PublicUser = Pick<DbUser, "name" | "email" | "role" | "status" | "plan" | "subject"> & { id: string };
+export type PublicUser = Pick<DbUser, "name" | "email" | "role" | "status" | "plan" | "subject" | "grade" | "stream"> & { id: string };
 
 export type DbQuestion = {
   _id?: ObjectId;

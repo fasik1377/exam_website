@@ -1,54 +1,91 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, Check, CheckCircle2, FileUp, ListChecks, LoaderCircle, MessageCircle, Plus, ShieldCheck, ToggleLeft, Trash2, Users, X } from "lucide-react";
+import { BarChart3, BookOpen, Check, FileUp, LayoutDashboard, ListChecks, LoaderCircle, MessageCircle, Plus, ShieldCheck, ToggleLeft, Trash2, X } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
 import { SUBJECTS as ALL_SUBJECTS } from "@/lib/subjects";
 import ImportDialog from "./ImportDialog";
+import QuestionsPanel, { type QuestionRow } from "./QuestionsPanel";
+import ResultsPanel, { type StudentRow } from "./ResultsPanel";
+import TeacherOverview, { type Overview } from "./TeacherOverview";
 
-type Recent = { id: string; question: string; subject: string; grade: string; unit: string };
-type Summary = { questions: number; myQuestions: number; students: number; attempts: number; unreadMessages: number; recent: Recent[] };
+type Tab = "overview" | "questions" | "results";
 
-type Loaded<T> = { data?: T; error?: string };
-
-async function fetchSummary(): Promise<Loaded<Summary>> {
-  const response = await fetch("/api/admin/summary", { cache: "no-store" }).catch(() => null);
-  if (!response) return { error: "Network error — could not load the dashboard." };
-  if (response.status === 401 || response.status === 403) { window.location.href = "/admin/login"; return {}; }
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) return { error: data.error || "Could not load the dashboard." };
-  return { data };
-}
-
-const initial = { type: "mcq" as "mcq" | "truefalse", subject: "Mathematics", grade: "Grade 12", unit: "Unit 1: Algebra", year: "2016 E.C.", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
+const initial = { type: "mcq" as "mcq" | "truefalse", subject: "Mathematics", grade: "Grade 12", unit: "Unit 1", year: "2016 E.C.", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
 const SUBJECTS = ALL_SUBJECTS.map((s) => s.name);
 const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 
+async function getJson<T>(url: string): Promise<{ data?: T; error?: string }> {
+  const response = await fetch(url, { cache: "no-store" }).catch(() => null);
+  if (!response) return { error: "Network error — check your connection." };
+  if (response.status === 401) { window.location.href = "/admin/login?next=/admin"; return {}; }
+  const data = await response.json().catch(() => ({}));
+  return response.ok ? { data } : { error: data.error || "Could not load data." };
+}
+
 export default function TeacherDashboard() {
   const { user } = useSession();
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const isTeacher = user?.role === "admin";
+  const [tab, setTab] = useState<Tab>("overview");
+  const [chosenSubject, setChosenSubject] = useState(SUBJECTS[0]);
+  // Teachers are locked to their own subject on the server; the super admin can browse any subject.
+  const subjectQuery = user && !isTeacher ? `?subject=${encodeURIComponent(chosenSubject)}` : "";
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [students, setStudents] = useState<StudentRow[] | null>(null);
+  const [questions, setQuestions] = useState<QuestionRow[] | null>(null);
+  const [unread, setUnread] = useState(0);
   const [loadError, setLoadError] = useState("");
   const [open, setOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [form, setForm] = useState(initial);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const apply = useCallback((result: Loaded<Summary>) => {
-    setLoadError(result.error ?? "");
-    if (result.data) setSummary(result.data);
+  const fetchAll = useCallback(async (query: string) => Promise.all([
+    getJson<Overview>(`/api/teacher/overview${query}`),
+    getJson<{ students: StudentRow[] }>(`/api/teacher/results${query}`),
+    getJson<{ questions: QuestionRow[] }>(`/api/teacher/questions${query}`),
+    getJson<{ unreadMessages: number }>("/api/admin/summary"),
+  ]), []);
+  const apply = useCallback(([o, r, q, s]: Awaited<ReturnType<typeof fetchAll>>) => {
+    setLoadError(o.error || r.error || q.error || "");
+    if (o.data) setOverview(o.data);
+    if (r.data) setStudents(r.data.students);
+    if (q.data) setQuestions(q.data.questions);
+    if (s.data) setUnread(s.data.unreadMessages);
   }, []);
-  const load = useCallback(() => fetchSummary().then(apply), [apply]);
+  const load = useCallback(() => fetchAll(subjectQuery).then(apply), [fetchAll, apply, subjectQuery]);
 
   useEffect(() => {
+    if (!user) return;
     let active = true;
-    fetchSummary().then((result) => active && apply(result));
+    fetchAll(subjectQuery).then((result) => active && apply(result));
     return () => { active = false; };
-  }, [apply]);
+  }, [user, subjectQuery, fetchAll, apply]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const id = window.setTimeout(() => setNotice(null), 5000);
+    return () => window.clearTimeout(id);
+  }, [notice]);
+
+  const subject = overview?.subject ?? (isTeacher ? user?.subject : chosenSubject) ?? "";
+  const accuracy = overview && overview.answers ? Math.round((overview.correct / overview.answers) * 100) : 0;
+  const tabs = useMemo(() => [
+    { id: "overview" as const, label: "Overview", icon: LayoutDashboard },
+    { id: "questions" as const, label: "My questions", icon: BookOpen, count: questions?.filter((q) => q.mine).length },
+    { id: "results" as const, label: "Student results", icon: BarChart3, count: students?.length },
+  ], [questions, students]);
+
+  function openForm() {
+    setForm({ ...initial, subject: isTeacher ? user?.subject || initial.subject : chosenSubject });
+    setError("");
+    setOpen(true);
+  }
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -62,8 +99,7 @@ export default function TeacherDashboard() {
     // Keep subject/grade/unit/type when adding several questions in a row.
     setForm({ ...initial, type: form.type, subject: form.subject, grade: form.grade, unit: form.unit, year: form.year, choices: form.type === "truefalse" ? ["True", "False"] : ["", "", "", ""] });
     if (!another) setOpen(false);
-    setNotice(another ? "Question published — ready for the next one." : "Question published to the student exam bank.");
-    window.setTimeout(() => setNotice(""), 5000);
+    setNotice({ ok: true, text: another ? "Question published — ready for the next one." : "Question published to the student exam bank." });
     load();
   }
 
@@ -75,23 +111,18 @@ export default function TeacherDashboard() {
     correctAnswer: form.correctAnswer === i ? 0 : form.correctAnswer > i ? form.correctAnswer - 1 : form.correctAnswer,
   });
   const setChoice = (i: number, value: string) => setForm({ ...form, choices: form.choices.map((item, index) => (index === i ? value : item)) });
-  const stats = [
-    { value: summary?.myQuestions, label: `My questions (of ${summary?.questions ?? "–"} total)`, icon: BookOpen, color: "bg-blue-50 text-royal" },
-    { value: summary?.students, label: "Active students", icon: Users, color: "bg-amber-50 text-amber-600" },
-    { value: summary?.attempts, label: "Recorded attempts", icon: CheckCircle2, color: "bg-green-50 text-green-600" },
-  ];
 
   return (
-    <main className="min-h-screen bg-[#f7f9fc] text-navy">
+    <main className="min-h-screen bg-[#f3f6fb] text-navy">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-lg">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3">
-          <Brand size="sm" subtitle="Teacher dashboard" />
+          <Brand size="sm" subtitle={isTeacher ? "Teacher" : "Question bank"} />
           <div className="flex items-center gap-2">
             {user?.role === "super-admin" && <Link href="/super-admin" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-royal hover:bg-blue-50 sm:inline-flex"><ShieldCheck size={16} /> Platform admin</Link>}
-            {user?.role === "admin" && (
+            {isTeacher && (
               <Link href="/chat" className="relative inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-navy hover:bg-slate-100">
                 <MessageCircle size={17} /> <span className="hidden sm:inline">Messages</span>
-                {!!summary?.unreadMessages && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1 text-[10px] font-extrabold text-navy">{summary.unreadMessages}</span>}
+                {!!unread && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1 text-[10px] font-extrabold text-navy">{unread}</span>}
               </Link>
             )}
             <AccountMenu />
@@ -99,60 +130,70 @@ export default function TeacherDashboard() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-5 py-9">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[.16em] text-royal">Welcome{user ? `, ${user.name.split(" ")[0]}` : ""} 👋</p>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight">Manage the live question bank.</h1>
-            {user?.subject && <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-3 py-1 text-xs font-bold text-amber-800"><BookOpen size={13} /> {user.subject} teacher</p>}
+      <div className="mx-auto grid max-w-7xl gap-6 px-5 py-8">
+        {/* Welcome banner */}
+        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-[#12306b] to-royal p-6 text-white sm:p-8">
+          <div className="bg-grid absolute inset-0" />
+          <div className="relative flex flex-wrap items-end justify-between gap-6">
+            <div className="max-w-xl">
+              <p className="text-xs font-bold uppercase tracking-[.18em] text-gold">{isTeacher ? "Teacher dashboard" : "Question bank"}</p>
+              <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Welcome{user ? `, ${user.name.split(" ")[0]}` : ""} 👋</h1>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {isTeacher ? (
+                  <span className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold"><BookOpen size={14} className="text-gold" /> {user?.subject ?? "No subject assigned"} teacher</span>
+                ) : user && (
+                  <label className="glass inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-bold">
+                    Subject
+                    <select value={chosenSubject} onChange={(e) => setChosenSubject(e.target.value)} className="rounded-lg bg-white/10 px-2 py-0.5 text-white outline-none [&>option]:text-navy">{SUBJECTS.map((s) => <option key={s}>{s}</option>)}</select>
+                  </label>
+                )}
+              </div>
+              <p className="mt-3 text-white/70">{overview ? `${overview.students} students study ${subject}. ${overview.activeLearners} have practised so far.` : "Loading your class…"}</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={openForm} className="btn-shine inline-flex items-center gap-2 rounded-xl bg-gold px-5 py-3 text-sm font-bold text-navy shadow-lg shadow-gold/20"><Plus size={17} /> Add question</motion.button>
+                <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => setImporting(true)} className="glass inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold hover:bg-white/15"><FileUp size={17} /> Upload questions</motion.button>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              {[{ label: "Accuracy", value: `${accuracy}%` }, { label: "Answers", value: overview?.answers ?? "–" }, { label: "Questions", value: overview?.questions ?? "–" }].map((s) => (
+                <div key={s.label} className="glass min-w-24 rounded-2xl px-4 py-3"><p className="text-2xl font-extrabold tabular-nums">{s.value}</p><p className="text-[11px] font-semibold uppercase tracking-wider text-white/60">{s.label}</p></div>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-          <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => setImporting(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold shadow-sm hover:border-royal">
-            <FileUp size={17} /> Upload questions
-          </motion.button>
-          <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => { setForm({ ...initial, subject: user?.subject || initial.subject }); setOpen(true); }} className="btn-shine inline-flex items-center gap-2 rounded-xl bg-navy px-5 py-3 text-sm font-bold text-white shadow-lg shadow-navy/15 hover:bg-royal">
-            <Plus size={17} /> Add question
-          </motion.button>
-          </div>
-        </motion.div>
+        </motion.section>
 
         <AnimatePresence>
-          {notice && <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mt-6 overflow-hidden rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-800">{notice}</motion.p>}
+          {notice && <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className={`overflow-hidden rounded-xl border p-4 text-sm font-semibold ${notice.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-700"}`}>{notice.text}</motion.p>}
         </AnimatePresence>
-        {loadError && <p className="mt-6 rounded-xl border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-700">{loadError}</p>}
+        {loadError && <p className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-700">{loadError}</p>}
 
-        <div className="mt-7 grid gap-4 sm:grid-cols-3">
-          {stats.map(({ value, label, icon: Icon, color }, i) => (
-            <motion.div key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 + i * 0.07 }} className="card-lift rounded-2xl border border-slate-200 bg-white p-5">
-              <span className={`grid h-10 w-10 place-items-center rounded-xl ${color}`}><Icon size={20} /></span>
-              <p className="mt-4 text-3xl font-extrabold">{value ?? <span className="inline-block h-8 w-12 animate-pulse rounded bg-slate-100 align-middle" />}</p>
-              <p className="text-sm text-slate-500">{label}</p>
-            </motion.div>
+        {/* Tabs */}
+        <nav className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5" aria-label="Teacher sections">
+          {tabs.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`relative flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === t.id ? "text-white" : "text-slate-500 hover:text-navy"}`}>
+              {tab === t.id && <motion.span layoutId="teacher-tab" className="absolute inset-0 rounded-xl bg-navy" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+              <t.icon size={16} className="relative" /><span className="relative">{t.label}</span>
+              {t.count !== undefined && <span className={`relative rounded-full px-1.5 text-[11px] ${tab === t.id ? "bg-white/20" : "bg-slate-100"}`}>{t.count}</span>}
+            </button>
           ))}
-        </div>
+        </nav>
 
-        <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="font-bold">Recently published</h2>
-          <div className="mt-4 divide-y divide-slate-100">
-            {summary?.recent.length ? summary.recent.map((q, i) => (
-              <motion.div key={q.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="flex items-start gap-4 py-4">
-                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold/20 text-xs font-extrabold">{q.subject.charAt(0)}</span>
-                <div>
-                  <p className="font-semibold">{q.question}</p>
-                  <p className="mt-1 text-xs text-slate-500">{q.subject} · {q.grade} · {q.unit}</p>
-                </div>
-              </motion.div>
-            )) : <p className="py-10 text-center text-sm text-slate-500">{summary ? "No questions yet. Add the first question to make exams dynamic." : "Loading..."}</p>}
-          </div>
-        </section>
+        <AnimatePresence mode="wait">
+          <motion.div key={tab + subjectQuery} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+            {tab === "overview" && <TeacherOverview data={overview} students={students} onOpenResults={() => setTab("results")} />}
+            {tab === "questions" && <QuestionsPanel subject={subject} rows={questions} canManageAll={user?.role === "super-admin"} onAdd={openForm} onChanged={(text, ok = true) => { setNotice({ ok, text }); load(); }} />}
+            {tab === "results" && <ResultsPanel subject={subject} rows={students} subjectQuery={subjectQuery} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <AnimatePresence>
         {importing && (
           <ImportDialog
-            defaultSubject={user?.subject}
+            defaultSubject={isTeacher ? user?.subject : chosenSubject}
+            lockSubject={isTeacher}
             onClose={() => setImporting(false)}
-            onPublished={(count) => { setImporting(false); setNotice(`${count} question${count === 1 ? "" : "s"} published from your file.`); window.setTimeout(() => setNotice(""), 6000); load(); }}
+            onPublished={(count) => { setImporting(false); setNotice({ ok: true, text: `${count} question${count === 1 ? "" : "s"} published from your file.` }); load(); }}
           />
         )}
       </AnimatePresence>
@@ -169,7 +210,7 @@ export default function TeacherDashboard() {
                 <button type="button" onClick={() => setOpen(false)} className="h-9 w-9 rounded-full hover:bg-slate-100" aria-label="Close"><X className="mx-auto" size={20} /></button>
               </div>
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <label className="text-sm font-bold">Subject<select value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{SUBJECTS.map((s) => <option key={s}>{s}</option>)}</select></label>
+                <label className="text-sm font-bold">Subject<select disabled={isTeacher} title={isTeacher ? "Teachers publish in their own subject" : undefined} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{SUBJECTS.map((s) => <option key={s}>{s}</option>)}</select></label>
                 <label className="text-sm font-bold">Grade<select value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{GRADES.map((g) => <option key={g}>{g}</option>)}</select></label>
                 <label className="text-sm font-bold">Unit<input required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
                 <label className="text-sm font-bold">Exam year<input required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>

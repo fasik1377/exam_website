@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Atom, BookOpenText, Brain, Calculator, Dna, FlaskConical, Globe2, Languages, Landmark, TrendingUp, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { STREAMS, isCommon, subjectsFor, type Stream } from "@/lib/subjects";
+import { useSession } from "@/app/components/useSession";
+import { STREAMS, isCommon, needsStream, subjectsForStudent, type Stream } from "@/lib/subjects";
 
 const GRADES = [
   { name: "Grade 9", note: "Build strong foundations" },
@@ -26,10 +27,19 @@ const STYLE: Record<string, { icon: LucideIcon; tint: string; color: string }> =
 
 const STREAM_ICON: Record<Stream, LucideIcon> = { natural: Atom, social: BookOpenText };
 
+/** Opens on a signed-in student's own grade and stream; everyone else starts at Grade 12 · Natural. */
 export default function GradePicker() {
-  const [grade, setGrade] = useState("Grade 12");
-  const [stream, setStream] = useState<Stream>("natural");
-  const subjects = subjectsFor(stream);
+  const { user } = useSession();
+  const mine = user?.role === "student" && user.grade ? user : null;
+  return <Picker key={mine ? `${mine.grade}-${mine.stream}` : "default"} initialGrade={mine?.grade ?? "Grade 12"} initialStream={mine?.stream ?? "natural"} personal={!!mine} />;
+}
+
+function Picker({ initialGrade, initialStream, personal }: { initialGrade: string; initialStream: Stream; personal: boolean }) {
+  const [grade, setGrade] = useState(initialGrade);
+  const [stream, setStream] = useState<Stream>(initialStream);
+  const withStream = needsStream(grade);
+  // Grades 9–10 study every subject; Grades 11–12 follow their stream.
+  const subjects = subjectsForStudent(grade, stream);
 
   return (
     <div>
@@ -63,8 +73,13 @@ export default function GradePicker() {
         })}
       </div>
 
+      {personal && <p className="mt-4 text-xs font-semibold text-royal">Showing your grade{withStream ? " and stream" : ""} from your profile.</p>}
+
+      <AnimatePresence initial={false}>
+      {withStream && (
+      <motion.div key="stream-step" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
       <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <StepLabel n={2} text="Choose your stream" />
+        <StepLabel n={2} text="Choose your stream (Grades 11–12)" />
         <div className="inline-grid grid-cols-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm" role="tablist" aria-label="Choose your stream">
           {STREAMS.map((item) => {
             const active = stream === item.id;
@@ -79,18 +94,25 @@ export default function GradePicker() {
           })}
         </div>
       </div>
+      </motion.div>
+      )}
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
-        <motion.p key={grade + stream} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-gold/40 bg-gold/10 px-5 py-4 text-sm font-semibold text-navy">
+        <motion.p key={grade + (withStream ? stream : "")} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-gold/40 bg-gold/10 px-5 py-4 text-sm font-semibold text-navy">
           <span className="text-lg">🎯</span>
           <span className="font-extrabold">{grade}</span>·
-          <span className="font-extrabold">{STREAMS.find((s) => s.id === stream)?.label}</span>
-          <span className="font-amharic text-slate-500">({STREAMS.find((s) => s.id === stream)?.amharic})</span>
+          {withStream ? (
+            <>
+              <span className="font-extrabold">{STREAMS.find((s) => s.id === stream)?.label}</span>
+              <span className="font-amharic text-slate-500">({STREAMS.find((s) => s.id === stream)?.amharic})</span>
+            </>
+          ) : <span className="font-extrabold">All subjects</span>}
           — pick a subject to start your practice exam.
         </motion.p>
       </AnimatePresence>
 
-      <div className="mt-8"><StepLabel n={3} text="Pick a subject" /></div>
+      <div className="mt-8"><StepLabel n={withStream ? 3 : 2} text="Pick a subject" /></div>
       <motion.div layout className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="popLayout">
           {subjects.map((subject, index) => {
@@ -106,7 +128,7 @@ export default function GradePicker() {
                   <span className="relative min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2 font-bold">
                       {subject.name}
-                      {isCommon(subject) && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Common</span>}
+                      {withStream && isCommon(subject) && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Common</span>}
                     </span>
                     <span className="block font-amharic text-sm text-slate-500">{subject.amharic}</span>
                   </span>
@@ -119,7 +141,7 @@ export default function GradePicker() {
           })}
         </AnimatePresence>
       </motion.div>
-      <p className="mt-4 text-xs text-slate-500">English, Mathematics and Scholastic Aptitude are common to both streams.</p>
+      <p className="mt-4 text-xs text-slate-500">{withStream ? "English, Mathematics and Scholastic Aptitude are common to both streams." : "Grades 9 and 10 practise every subject. Students choose Natural or Social Science in Grade 11."}</p>
     </div>
   );
 }

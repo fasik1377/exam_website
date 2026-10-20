@@ -56,9 +56,43 @@ export async function POST(request: Request) {
     for (const [index, item] of items.entries()) {
       const result = toQuestion(item && typeof item === "object" ? item : {}, defaults, auth.user);
       if (typeof result === "string") return Response.json({ error: items.length > 1 ? `Question ${index + 1}: ${result}` : result, index }, { status: 400 });
+      // Teachers can only publish in their own subject.
+      if (auth.user.role === "admin") {
+        if (!auth.user.subject) return Response.json({ error: "Your account has no subject yet. Ask the platform administrator to assign one." }, { status: 409 });
+        result.subject = auth.user.subject;
+      }
       docs.push(result);
     }
     const result = await (await getDb()).collection<DbQuestion>("questions").insertMany(docs);
     return Response.json({ inserted: result.insertedCount, id: result.insertedIds[0]?.toString() }, { status: 201 });
+  } catch (error) { return apiError(error); }
+}
+
+/** Hide/publish a question. Teachers: their own questions only; super admin: any. */
+export async function PATCH(request: Request) {
+  try {
+    const auth = await requireUser(["admin", "super-admin"]); if (auth.error) return auth.error;
+    const body = await readJson(request);
+    const id = cleanString(body.id, 40);
+    if (!ObjectId.isValid(id) || typeof body.published !== "boolean") return Response.json({ error: "Invalid update" }, { status: 400 });
+    const filter = { _id: new ObjectId(id), ...(auth.user.role === "admin" ? { createdBy: new ObjectId(auth.user.id) } : {}) };
+    const result = await (await getDb()).collection("questions").updateOne(filter, { $set: { published: body.published, updatedAt: new Date() } });
+    if (!result.matchedCount) return Response.json({ error: "You can only change your own questions" }, { status: 403 });
+    return Response.json({ ok: true });
+  } catch (error) { return apiError(error); }
+}
+
+/** Delete a question (and its practice answers). Teachers: their own only; super admin: any. */
+export async function DELETE(request: Request) {
+  try {
+    const auth = await requireUser(["admin", "super-admin"]); if (auth.error) return auth.error;
+    const id = new URL(request.url).searchParams.get("id") ?? "";
+    if (!ObjectId.isValid(id)) return Response.json({ error: "Question not found" }, { status: 404 });
+    const db = await getDb();
+    const filter = { _id: new ObjectId(id), ...(auth.user.role === "admin" ? { createdBy: new ObjectId(auth.user.id) } : {}) };
+    const result = await db.collection("questions").deleteOne(filter);
+    if (!result.deletedCount) return Response.json({ error: "You can only delete your own questions" }, { status: 403 });
+    await db.collection("attempts").deleteMany({ questionId: new ObjectId(id) });
+    return Response.json({ ok: true });
   } catch (error) { return apiError(error); }
 }

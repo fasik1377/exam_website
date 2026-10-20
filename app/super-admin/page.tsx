@@ -2,7 +2,7 @@
 import { AnimatePresence, animate, motion } from "framer-motion";
 import {
   AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, LayoutDashboard, LoaderCircle,
-  KeyRound, Mail, MessageCircle, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
+  KeyRound, Mail, MessageCircle, Trash2, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -10,11 +10,11 @@ import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent, ty
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
-import { SUBJECTS } from "@/lib/subjects";
+import { SUBJECTS, streamLabel } from "@/lib/subjects";
 import { AccuracyBars, DailyStacked, Heatmap, Meter, SERIES, STATUS, Sparkline, StackedBar, SubjectBars, TrendChart } from "./charts";
 
 type Status = "pending" | "active" | "restricted" | "banned" | "rejected";
-type Account = { id: string; name: string; email: string; role: string; plan: string; status: Status; subject: string | null; createdAt: string };
+type Account = { id: string; name: string; email: string; role: string; plan: string; status: Status; subject: string | null; createdAt: string; owner?: boolean; grade?: string | null; stream?: "natural" | "social" | null };
 type Overview = {
   usersByRoleStatus: { role: string; status: string; count: number }[];
   signups: { date: string; count: number }[];
@@ -123,6 +123,8 @@ function SuperAdmin() {
     reload();
   }
 
+  const [deleting, setDeleting] = useState<Account | null>(null);
+
   async function setPassword(account: Account) {
     const password = window.prompt(`New password for ${account.name} (at least 8 characters). They will be signed out and must use this password.`);
     if (!password) return;
@@ -187,12 +189,22 @@ function SuperAdmin() {
             <motion.div key={section} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
               {section === "overview" && <OverviewSection name={user?.name} users={users} overview={overview} pending={pending} busy={busy} onDecide={setStatus} goTo={setSection} updatedAt={updatedAt} />}
               {section === "approvals" && <ApprovalsSection pending={pending} busy={busy} onDecide={setStatus} />}
-              {section === "users" && <UsersSection users={users} me={me} busy={busy} onDecide={setStatus} onSubject={setSubject} onPassword={setPassword} />}
+              {section === "users" && <UsersSection users={users} me={me} busy={busy} onDecide={setStatus} onSubject={setSubject} onPassword={setPassword} onDelete={setDeleting} />}
               {section === "staff" && <StaffSection onCreated={(text) => { setToast({ ok: true, text }); reload(); }} onError={(text) => setToast({ ok: false, text })} />}
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
+
+      <AnimatePresence>
+        {deleting && (
+          <DeleteAccountDialog
+            account={deleting}
+            onClose={() => setDeleting(null)}
+            onDeleted={(text) => { setDeleting(null); setToast({ ok: true, text }); reload(); }}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {toast && (
@@ -604,6 +616,7 @@ function ApprovalCard({ user, busy, onDecide }: { user: Account; busy: boolean; 
               {teacher ? <BookOpen size={12} /> : <GraduationCap size={12} />}{teacher ? "Teacher" : "Student"}
             </span>
             {user.subject && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{user.subject}</span>}
+            {user.grade && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{user.grade}{user.stream ? ` · ${streamLabel(user.stream)}` : ""}</span>}
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700"><Clock3 size={12} />{timeAgo(user.createdAt)}</span>
           </div>
         </div>
@@ -632,7 +645,7 @@ function AllCaughtUp() {
 
 /* ---------------- Users ---------------- */
 
-function UsersSection({ users, me, busy, onDecide, onSubject, onPassword }: { users: Account[]; me: string; busy: string[]; onDecide: (ids: string[], status: Status, verb: string) => void; onSubject: (id: string, subject: string) => void; onPassword: (user: Account) => void }) {
+function UsersSection({ users, me, busy, onDecide, onSubject, onPassword, onDelete }: { users: Account[]; me: string; busy: string[]; onDecide: (ids: string[], status: Status, verb: string) => void; onSubject: (id: string, subject: string) => void; onPassword: (user: Account) => void; onDelete: (user: Account) => void }) {
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
   const [status, setStatus] = useState<"all" | Status>("all");
@@ -679,7 +692,7 @@ function UsersSection({ users, me, busy, onDecide, onSubject, onPassword }: { us
                     <td className="py-3.5">
                       <div className="flex items-center gap-3">
                         <span className="grid h-9 w-9 place-items-center rounded-full bg-navy text-xs font-bold text-white">{u.name.charAt(0).toUpperCase()}</span>
-                        <div className="min-w-0"><p className="font-bold">{u.name}{isMe && <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-royal">YOU</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div>
+                        <div className="min-w-0"><p className="font-bold">{u.name}{isMe && <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-royal">YOU</span>}{u.owner && !isMe && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">OWNER</span>}</p><p className="text-xs text-slate-500">{u.email}</p></div>
                       </div>
                     </td>
                     <td>
@@ -689,7 +702,7 @@ function UsersSection({ users, me, busy, onDecide, onSubject, onPassword }: { us
                           <option value="" disabled>Assign subject…</option>
                           {SUBJECTS.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
                         </select>
-                      ) : u.subject && <span className="block text-xs text-slate-500">{u.subject}</span>}
+                      ) : u.subject ? <span className="block text-xs text-slate-500">{u.subject}</span> : u.grade ? <span className="block text-xs text-slate-500">{u.grade}{u.stream ? ` · ${streamLabel(u.stream)}` : ""}</span> : u.role === "student" ? <span className="block text-xs text-amber-700">Grade not set</span> : null}
                     </td>
                     <td className="text-slate-500">{u.createdAt ? timeAgo(u.createdAt) : "—"}</td>
                     <td><span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${meta.pill}`}><meta.icon size={12} />{meta.label}</span></td>
@@ -698,6 +711,7 @@ function UsersSection({ users, me, busy, onDecide, onSubject, onPassword }: { us
                         <div className="inline-flex gap-1.5">
                           <button disabled={busy.includes(u.id)} onClick={() => onDecide([u.id], "active", "approved")} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700 disabled:opacity-60">Approve</button>
                           <button disabled={busy.includes(u.id)} onClick={() => onDecide([u.id], "rejected", "rejected")} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                          {!u.owner && <button title="Delete account" disabled={busy.includes(u.id)} onClick={() => onDelete(u)} className="rounded-lg border border-red-200 p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-60"><Trash2 size={14} /></button>}
                         </div>
                       ) : (
                         <div className="inline-flex items-center gap-1.5">
@@ -706,6 +720,7 @@ function UsersSection({ users, me, busy, onDecide, onSubject, onPassword }: { us
                             <option value="active">Active</option><option value="restricted">Restricted</option><option value="banned">Banned</option>
                             {u.status === "rejected" && <option value="rejected">Rejected</option>}
                           </select>
+                          {!u.owner && <button title="Delete account" disabled={busy.includes(u.id)} onClick={() => onDelete(u)} className="rounded-lg border border-red-200 p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-60"><Trash2 size={14} /></button>}
                         </div>
                       )}
                     </td>
@@ -718,6 +733,84 @@ function UsersSection({ users, me, busy, onDecide, onSubject, onPassword }: { us
         </div>
       </section>
     </div>
+  );
+}
+
+/** Confirmation for permanently deleting an account: shows what goes with it and requires typing DELETE. */
+function DeleteAccountDialog({ account, onClose, onDeleted }: { account: Account; onClose: () => void; onDeleted: (text: string) => void }) {
+  const [preview, setPreview] = useState<{ questions: number; attempts: number; messages: number; privateChats: number } | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [withQuestions, setWithQuestions] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/admin/users?id=${account.id}&preview=1`, { method: "DELETE" })
+      .then((r) => r.json())
+      .then((d) => { if (!active) return; if (d.preview) setPreview(d.preview); else setError(d.error || "Could not load account details."); })
+      .catch(() => active && setError("Network error."));
+    return () => { active = false; };
+  }, [account.id]);
+
+  async function remove() {
+    setWorking(true);
+    setError("");
+    const response = await fetch(`/api/admin/users?id=${account.id}${withQuestions ? "&deleteQuestions=1" : ""}`, { method: "DELETE" }).catch(() => null);
+    const data = await response?.json().catch(() => ({}));
+    setWorking(false);
+    if (!response?.ok) return setError(data?.error || "Could not delete the account.");
+    onDeleted(`${account.name}'s account was deleted.`);
+  }
+
+  const items = preview ? [
+    { label: "Private chats", value: preview.privateChats },
+    { label: "Chat messages", value: preview.messages },
+    { label: "Practice answers", value: preview.attempts },
+  ] : [];
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 grid place-items-center bg-navy/50 p-4 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && !working && onClose()}>
+      <motion.div role="alertdialog" aria-modal="true" aria-labelledby="delete-title" initial={{ opacity: 0, scale: 0.96, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="flex items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-red-50 text-red-600"><Trash2 size={20} /></span>
+          <div className="min-w-0">
+            <h2 id="delete-title" className="text-xl font-extrabold">Delete this account?</h2>
+            <p className="mt-0.5 text-sm text-slate-500">This permanently removes the account and can&apos;t be undone.</p>
+          </div>
+        </div>
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="font-bold">{account.name}</p>
+          <p className="text-sm text-slate-500">{account.email} · {ROLE_LABEL[account.role] ?? account.role}{account.subject ? ` · ${account.subject}` : ""}</p>
+        </div>
+        {!preview && !error && <div className="mt-4 h-20 animate-pulse rounded-2xl bg-slate-100" />}
+        {preview && (
+          <>
+            <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-400">Also deleted</p>
+            <ul className="mt-2 grid grid-cols-3 gap-2 text-center">
+              {items.map((i) => <li key={i.label} className="rounded-xl bg-red-50/60 p-2"><p className="text-lg font-extrabold tabular-nums text-red-700">{i.value}</p><p className="text-[11px] font-semibold text-slate-500">{i.label}</p></li>)}
+            </ul>
+            {preview.questions > 0 && (
+              <label className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
+                <input type="checkbox" checked={withQuestions} onChange={(e) => setWithQuestions(e.target.checked)} className="mt-0.5 h-4 w-4 accent-red-600" />
+                <span><b>Also delete their {preview.questions} published question{preview.questions === 1 ? "" : "s"}</b><span className="block text-xs text-amber-800">Leave unticked to keep the questions available to students.</span></span>
+              </label>
+            )}
+          </>
+        )}
+        <label className="mt-4 block text-sm font-semibold">
+          Type <span className="rounded bg-slate-100 px-1.5 font-mono text-red-600">DELETE</span> to confirm
+          <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoFocus className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-mono outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100" />
+        </label>
+        {error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button onClick={onClose} disabled={working} className="rounded-xl border border-slate-200 py-3 text-sm font-bold hover:bg-slate-50 disabled:opacity-60">Cancel</button>
+          <button onClick={remove} disabled={working || confirmText !== "DELETE" || !preview} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-40">
+            {working ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />} Delete account
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

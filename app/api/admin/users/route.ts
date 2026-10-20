@@ -8,6 +8,8 @@ import { SUBJECTS } from "@/lib/subjects";
 import type { UserStatus } from "@/lib/types";
 
 const validSubject = (value: unknown) => SUBJECTS.some((s) => s.name === value);
+/** The platform owner (SUPER_ADMIN_EMAIL) can never be deleted from the dashboard. */
+const isOwner = (email: string) => email.toLowerCase() === (process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase();
 
 const SETTABLE: UserStatus[] = ["active", "restricted", "banned", "rejected"];
 
@@ -17,7 +19,7 @@ export async function GET() {
     const users = await (await getDb()).collection("users").find({}, { projection: { passwordHash: 0 } }).sort({ createdAt: -1 }).limit(500).toArray();
     return Response.json({
       me: auth.user.id,
-      users: users.map((u) => ({ id: u._id.toString(), name: u.name, email: u.email, role: u.role, plan: u.plan, status: u.status, subject: u.subject ?? null, createdAt: u.createdAt })),
+      users: users.map((u) => ({ id: u._id.toString(), name: u.name, email: u.email, role: u.role, plan: u.plan, status: u.status, subject: u.subject ?? null, grade: u.grade ?? null, stream: u.stream ?? null, createdAt: u.createdAt, owner: isOwner(u.email) })),
     });
   } catch (error) { return apiError(error); }
 }
@@ -80,5 +82,54 @@ export async function POST(request: Request) {
     const db = await getDb(); if (await db.collection("users").findOne({ email })) return Response.json({ error: "An account with this email already exists" }, { status: 409 });
     const now = new Date(); await db.collection("users").insertOne({ name, email, passwordHash: await hashPassword(password), role, status: "active", plan: "teacher", ...(role === "admin" ? { subject: body.subject } : {}), createdAt: now, updatedAt: now, reviewedAt: now, reviewedBy: new ObjectId(auth.user.id) });
     return Response.json({ ok: true }, { status: 201 });
+  } catch (error) { return apiError(error); }
+}
+
+/** What deleting an account would remove — shown in the confirmation dialog. */
+async function footprint(db: Awaited<ReturnType<typeof getDb>>, userId: ObjectId) {
+  const direct = await db.collection("chats").find({ kind: "direct", participants: userId }, { projection: { _id: 1 } }).toArray();
+  const [questions, attempts, messages] = await Promise.all([
+    db.collection("questions").countDocuments({ createdBy: userId }),
+    db.collection("attempts").countDocuments({ userId }),
+    db.collection("chat_messages").countDocuments({ $or: [{ senderId: userId }, { chatId: { $in: direct.map((c) => c._id) } }] }),
+  ]);
+  return { questions, attempts, messages, privateChats: direct.length, directIds: direct.map((c) => c._id) };
+}
+
+/**
+ * Permanently deletes an account and its personal data.
+ * GET-style preview: DELETE ?id=…&preview=1 returns counts without deleting.
+ * Teacher questions are kept (students still need them) unless deleteQuestions=1.
+ */
+export async function DELETE(request: Request) {
+  try {
+    const auth = await requireUser(["super-admin"]); if (auth.error) return auth.error;
+    const url = new URL(request.url);
+    const id = cleanString(url.searchParams.get("id"), 40);
+    if (!ObjectId.isValid(id)) return Response.json({ error: "Account not found" }, { status: 404 });
+    if (id === auth.user.id) return Response.json({ error: "You can't delete your own account" }, { status: 400 });
+    const db = await getDb();
+    const userId = new ObjectId(id);
+    const user = await db.collection("users").findOne({ _id: userId });
+    if (!user) return Response.json({ error: "Account not found" }, { status: 404 });
+    if (isOwner(user.email)) return Response.json({ error: "The platform owner account can't be deleted" }, { status: 403 });
+
+    const found = await footprint(db, userId);
+    const { directIds, ...counts } = found;
+    if (url.searchParams.get("preview") === "1") return Response.json({ preview: counts });
+
+    const deleteQuestions = url.searchParams.get("deleteQuestions") === "1";
+    await Promise.all([
+      db.collection("sessions").deleteMany({ userId }),
+      db.collection("password_resets").deleteMany({ userId }),
+      db.collection("login_failures").deleteMany({ email: user.email }),
+      db.collection("attempts").deleteMany({ userId }),
+      db.collection("chat_reads").deleteMany({ userId }),
+      db.collection("chat_messages").deleteMany({ $or: [{ senderId: userId }, { chatId: { $in: directIds } }] }),
+      db.collection("chats").deleteMany({ _id: { $in: directIds } }),
+      deleteQuestions ? db.collection("questions").deleteMany({ createdBy: userId }) : Promise.resolve(),
+    ]);
+    await db.collection("users").deleteOne({ _id: userId });
+    return Response.json({ ok: true, deleted: { name: user.name, email: user.email, ...counts, questions: deleteQuestions ? counts.questions : 0 } });
   } catch (error) { return apiError(error); }
 }

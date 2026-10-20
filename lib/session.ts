@@ -20,7 +20,7 @@ export function roleHome(role: UserRole) {
 }
 
 export function toPublicUser(user: DbUser & { _id: ObjectId }): PublicUser {
-  return { id: user._id.toString(), name: user.name, email: user.email, role: user.role, status: user.status, plan: user.plan, subject: user.subject };
+  return { id: user._id.toString(), name: user.name, email: user.email, role: user.role, status: user.status, plan: user.plan, subject: user.subject, grade: user.grade, stream: user.stream ?? null };
 }
 
 type SessionRow = { expiresAt: Date; revokedAt?: Date | null; revokedReason?: SessionEndReason; user: (DbUser & { _id: ObjectId })[] };

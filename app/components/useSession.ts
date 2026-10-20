@@ -9,6 +9,8 @@ export type SessionUser = {
   status: string;
   plan: "free" | "monthly" | "yearly" | "teacher";
   subject?: string;
+  grade?: string;
+  stream?: "natural" | "social" | null;
 };
 
 /** Why the visitor was signed out (e.g. their account signed in on another device). */

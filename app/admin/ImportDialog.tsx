@@ -8,10 +8,10 @@ import { SUBJECTS } from "@/lib/subjects";
 const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 const ACCEPT = ".doc,.docx,.pdf,.txt";
 
-type Props = { defaultSubject?: string; onClose: () => void; onPublished: (count: number) => void };
+type Props = { defaultSubject?: string; lockSubject?: boolean; onClose: () => void; onPublished: (count: number) => void };
 
 /** Upload a .docx / .pdf / .txt exam paper, review the questions found in it, then publish them in one go. */
-export default function ImportDialog({ defaultSubject, onClose, onPublished }: Props) {
+export default function ImportDialog({ defaultSubject, lockSubject = false, onClose, onPublished }: Props) {
   const [meta, setMeta] = useState({ subject: defaultSubject || "Mathematics", grade: "Grade 12", unit: "", year: "2016 E.C." });
   const [stage, setStage] = useState<"upload" | "reading" | "review">("upload");
   const [fileName, setFileName] = useState("");
@@ -91,7 +91,7 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
 
         {/* Shared details for every question in the file */}
         <div className="mt-6 grid gap-3 sm:grid-cols-4">
-          <Select label="Subject" value={meta.subject} options={SUBJECTS.map((s) => s.name)} onChange={(v) => setMeta({ ...meta, subject: v })} />
+          <Select label="Subject" disabled={lockSubject} value={meta.subject} options={SUBJECTS.map((s) => s.name)} onChange={(v) => setMeta({ ...meta, subject: v })} />
           <Select label="Grade" value={meta.grade} options={GRADES} onChange={(v) => setMeta({ ...meta, grade: v })} />
           <label className="text-xs font-bold text-slate-600">Unit<input value={meta.unit} onChange={(e) => setMeta({ ...meta, unit: e.target.value })} placeholder="e.g. Unit 2: Functions" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
           <label className="text-xs font-bold text-slate-600">Exam year<input value={meta.year} onChange={(e) => setMeta({ ...meta, year: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
@@ -215,11 +215,11 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
   );
 }
 
-function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
+function Select({ label, value, options, onChange, disabled = false }: { label: string; value: string; options: string[]; onChange: (v: string) => void; disabled?: boolean }) {
   return (
     <label className="text-xs font-bold text-slate-600">
       {label}
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal">
+      <select disabled={disabled} value={value} onChange={(e) => onChange(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal disabled:bg-slate-50 disabled:text-slate-500">
         {options.map((o) => <option key={o}>{o}</option>)}
       </select>
     </label>

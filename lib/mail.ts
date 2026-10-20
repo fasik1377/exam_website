@@ -71,7 +71,8 @@ export function notifyPasswordReset(user: { name: string; email: string }, token
   return send(user.email, "Reset your እውቀትNET password", layout("Reset your password", `Hi ${user.name}, we received a request to reset your password. The link below works for 1 hour. If you didn't ask for this, you can ignore this email.`, [], { label: "Choose a new password", href: link }), `Reset your password (valid for 1 hour): ${link}`);
 }
 
-type Applicant = { name: string; email: string; role: "student" | "admin"; subject?: string };
+type Applicant = { name: string; email: string; role: "student" | "admin"; subject?: string; grade?: string; stream?: string | null };
+const streamName = (stream?: string | null) => (stream === "natural" ? "Natural Science" : stream === "social" ? "Social Science" : "");
 
 /** Tells the super admin(s) that someone registered and is waiting for approval. */
 export function notifyNewRegistration(applicant: Applicant, adminEmails: string[]) {
@@ -81,6 +82,8 @@ export function notifyNewRegistration(applicant: Applicant, adminEmails: string[
   if (!to) return Promise.resolve({ ok: false, error: "No notification address" });
   const rows: [string, string][] = [["Name", applicant.name], ["Email", applicant.email], ["Role", roleLabel]];
   if (applicant.subject) rows.push(["Subject", applicant.subject]);
+  if (applicant.grade) rows.push(["Grade", applicant.grade]);
+  if (applicant.stream) rows.push(["Stream", streamName(applicant.stream)]);
   rows.push(["Registered", new Date().toUTCString()]);
   const link = `${siteUrl()}/super-admin?tab=approvals`;
   return send(
@@ -92,7 +95,7 @@ export function notifyNewRegistration(applicant: Applicant, adminEmails: string[
 }
 
 /** Tells an applicant that their account was approved or rejected. */
-type Applicant2 = { name: string; email: string; role: "student" | "admin" | string; subject?: string | null };
+type Applicant2 = { name: string; email: string; role: "student" | "admin" | string; subject?: string | null; grade?: string | null; stream?: string | null };
 const roleWord = (role: string) => (role === "admin" ? "teacher" : "student");
 const loginPath = (role: string) => (role === "admin" ? "/admin/login" : "/login");
 
@@ -100,6 +103,8 @@ const loginPath = (role: string) => (role === "admin" ? "/admin/login" : "/login
 export function notifyRegistrationReceived(user: Applicant2) {
   const rows: [string, string][] = [["Name", user.name], ["Email", user.email], ["Account type", roleWord(user.role) === "teacher" ? "Teacher" : "Student"]];
   if (user.subject) rows.push(["Subject", user.subject]);
+  if (user.grade) rows.push(["Grade", user.grade]);
+  if (user.stream) rows.push(["Stream", streamName(user.stream)]);
   rows.push(["Status", "Waiting for approval"]);
   return send(
     user.email,

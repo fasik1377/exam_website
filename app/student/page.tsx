@@ -5,16 +5,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
-import { STREAMS, subjectsFor, type Stream } from "@/lib/subjects";
+import { GRADES, STREAMS, needsStream, streamLabel, subjectsForStudent, type Stream } from "@/lib/subjects";
 
 type Summary = {
-  user: { name: string; plan: string };
+  user: { name: string; plan: string; grade?: string | null; stream?: Stream | null };
   total: number; correct: number; week: number; streak: number; unread: number;
   subjects: { subject: string; total: number; correct: number }[];
   recent: { prompt: string; subject: string; correct: boolean; createdAt: string }[];
 };
 
-const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 
 async function fetchSummary(): Promise<Summary | null> {
   const response = await fetch("/api/student/summary", { cache: "no-store" }).catch(() => null);
@@ -25,8 +24,9 @@ async function fetchSummary(): Promise<Summary | null> {
 /** Student home: progress, where to practise next, and quick access to chat. */
 export default function StudentDashboard() {
   const [data, setData] = useState<Summary | null>(null);
-  const [grade, setGrade] = useState("Grade 12");
-  const [stream, setStream] = useState<Stream>("natural");
+  const [editing, setEditing] = useState(false);
+  const grade = data?.user.grade ?? null;
+  const stream = data?.user.stream ?? null;
 
   useEffect(() => {
     let active = true;
@@ -78,35 +78,44 @@ export default function StudentDashboard() {
           ))}
         </div>
 
-        {/* Practise */}
+        {/* Practise — based on the student's grade and stream */}
         <section className="rounded-3xl border border-slate-200 bg-white p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-extrabold">Start practising</h2>
-              <p className="text-sm text-slate-500">Choose your grade and stream, then a subject.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <select value={grade} onChange={(e) => setGrade(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold">{GRADES.map((g) => <option key={g}>{g}</option>)}</select>
-              <div className="inline-grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-xs font-bold">
-                {STREAMS.map((s) => (
-                  <button key={s.id} onClick={() => setStream(s.id)} className={`relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${stream === s.id ? "text-navy" : "text-slate-500"}`}>
-                    {stream === s.id && <motion.span layoutId="student-stream" className="absolute inset-0 rounded-lg bg-white shadow-sm" />}
-                    {s.id === "natural" ? <Atom size={13} className="relative" /> : <BookOpenText size={13} className="relative" />}
-                    <span className="relative">{s.label}</span>
-                  </button>
-                ))}
+          {data && (!grade || editing) ? (
+            <GradeEditor
+              initialGrade={grade}
+              initialStream={stream}
+              required={!grade}
+              onCancel={grade ? () => setEditing(false) : undefined}
+              onSaved={(g, st) => { setData({ ...data, user: { ...data.user, grade: g, stream: st } }); setEditing(false); }}
+            />
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-extrabold">Start practising</h2>
+                  <p className="text-sm text-slate-500">Questions for your grade{needsStream(grade) ? " and stream" : ""}.</p>
+                </div>
+                {grade && (
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-royal/10 px-3 py-1.5 text-xs font-bold text-royal">
+                      {grade}{needsStream(grade) && stream ? <> · {stream === "natural" ? <Atom size={13} /> : <BookOpenText size={13} />} {streamLabel(stream)}</> : " · All subjects"}
+                    </span>
+                    <button onClick={() => setEditing(true)} className="rounded-lg px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100 hover:text-navy">Edit</button>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {subjectsFor(stream).map((s) => (
-              <Link key={s.name} href={`/exam?grade=${encodeURIComponent(grade)}&subject=${encodeURIComponent(s.name)}`} className="card-lift group flex items-center gap-3 rounded-2xl border border-slate-200 p-4">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-royal/10 font-extrabold text-royal">{s.name.charAt(0)}</span>
-                <span className="flex-1"><span className="block font-bold">{s.name}</span><span className="font-amharic text-xs text-slate-500">{s.amharic}</span></span>
-                <ArrowRight size={16} className="text-slate-400 transition group-hover:translate-x-1 group-hover:text-navy" />
-              </Link>
-            ))}
-          </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {grade && subjectsForStudent(grade, stream).map((s) => (
+                  <Link key={s.name} href={`/exam?grade=${encodeURIComponent(grade)}&subject=${encodeURIComponent(s.name)}`} className="card-lift group flex items-center gap-3 rounded-2xl border border-slate-200 p-4">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-royal/10 font-extrabold text-royal">{s.name.charAt(0)}</span>
+                    <span className="flex-1"><span className="block font-bold">{s.name}</span><span className="font-amharic text-xs text-slate-500">{s.amharic}</span></span>
+                    <ArrowRight size={16} className="text-slate-400 transition group-hover:translate-x-1 group-hover:text-navy" />
+                  </Link>
+                ))}
+                {!data && Array.from({ length: 6 }, (_, i) => <span key={i} className="h-[4.5rem] animate-pulse rounded-2xl bg-slate-100" />)}
+              </div>
+            </>
+          )}
         </section>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -155,5 +164,54 @@ export default function StudentDashboard() {
         </section>
       </div>
     </main>
+  );
+}
+
+/** Lets a student set or change their grade and (Grades 11–12) stream. */
+function GradeEditor({ initialGrade, initialStream, required, onCancel, onSaved }: {
+  initialGrade: string | null; initialStream: Stream | null; required: boolean;
+  onCancel?: () => void; onSaved: (grade: string, stream: Stream | null) => void;
+}) {
+  const [grade, setGrade] = useState(initialGrade ?? "");
+  const [stream, setStream] = useState<Stream | "">(initialStream ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    const response = await fetch("/api/student/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ grade, stream: needsStream(grade) ? stream : null }) }).catch(() => null);
+    const data = await response?.json().catch(() => ({}));
+    setSaving(false);
+    if (!response?.ok) return setError(data?.error || "Could not save.");
+    onSaved(data.grade, data.stream);
+  }
+
+  return (
+    <div>
+      <h2 className="text-lg font-extrabold">{required ? "Tell us your grade" : "Change your grade"}</h2>
+      <p className="text-sm text-slate-500">{required ? "We show questions for your grade and stream." : "Moving up a year? Update it here."}</p>
+      <div className="mt-4 grid max-w-md grid-cols-4 gap-2">
+        {GRADES.map((g) => (
+          <button key={g} type="button" onClick={() => { setGrade(g); if (!needsStream(g)) setStream(""); }} className={`rounded-xl border-2 py-2.5 text-center ${grade === g ? "border-royal bg-blue-50 text-royal" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+            <span className="block text-lg font-extrabold leading-5">{g.split(" ")[1]}</span><span className="text-[10px] font-bold uppercase tracking-wider">Grade</span>
+          </button>
+        ))}
+      </div>
+      {needsStream(grade) && (
+        <div className="mt-3 grid max-w-md grid-cols-2 gap-2">
+          {STREAMS.map((st) => (
+            <button key={st.id} type="button" onClick={() => setStream(st.id)} className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-left text-sm font-bold ${stream === st.id ? "border-royal bg-blue-50 text-royal" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+              {st.id === "natural" ? <Atom size={16} /> : <BookOpenText size={16} />}{st.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
+      <div className="mt-4 flex gap-2">
+        <button onClick={save} disabled={saving || !grade || (needsStream(grade) && !stream)} className="rounded-xl bg-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-royal disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
+        {onCancel && <button onClick={onCancel} className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold hover:bg-slate-50">Cancel</button>}
+      </div>
+    </div>
   );
 }

@@ -3,7 +3,7 @@ import { ensureDatabase, hashPassword } from "@/lib/auth";
 import { notifyNewRegistration, notifyRegistrationReceived } from "@/lib/mail";
 import { apiError, cleanString, readJson } from "@/lib/api";
 import { getDb } from "@/lib/db";
-import { SUBJECTS } from "@/lib/subjects";
+import { SUBJECTS, parseGradeStream } from "@/lib/subjects";
 import type { DbUser } from "@/lib/types";
 
 /** Students and teachers register here; every new account waits for super-admin approval before it can sign in. */
@@ -22,19 +22,22 @@ export async function POST(request: Request) {
     if (role === "admin" && !SUBJECTS.some((s) => s.name === subject)) {
       return Response.json({ error: "Choose the subject you teach" }, { status: 400 });
     }
+    // Students: grade 9–12, and Natural/Social stream for Grades 11–12 (questions are shown by grade and stream).
+    const level = role === "student" ? parseGradeStream(body.grade, body.stream) : null;
+    if (typeof level === "string") return Response.json({ error: level }, { status: 400 });
     const db = await getDb();
     if (await db.collection("users").findOne({ email })) return Response.json({ error: "An account with this email already exists" }, { status: 409 });
     const now = new Date();
     await db.collection<DbUser>("users").insertOne({
       name, email, passwordHash: await hashPassword(password), role, status: "pending",
-      plan: role === "admin" ? "teacher" : "free", ...(role === "admin" ? { subject } : {}), createdAt: now, updatedAt: now,
+      plan: role === "admin" ? "teacher" : "free", ...(role === "admin" ? { subject } : {}), ...(level ? { grade: level.grade, stream: level.stream } : {}), createdAt: now, updatedAt: now,
     });
     // After responding (so registration stays fast): alert the platform owner, and confirm to the applicant.
     after(async () => {
       const admins = await db.collection<DbUser>("users").find({ role: "super-admin", status: "active" }, { projection: { email: 1 } }).toArray();
       await Promise.all([
-        notifyNewRegistration({ name, email, role, subject: role === "admin" ? subject : undefined }, admins.map((a) => a.email)),
-        notifyRegistrationReceived({ name, email, role, subject: role === "admin" ? subject : null }),
+        notifyNewRegistration({ name, email, role, subject: role === "admin" ? subject : undefined, grade: level?.grade, stream: level?.stream }, admins.map((a) => a.email)),
+        notifyRegistrationReceived({ name, email, role, subject: role === "admin" ? subject : null, grade: level?.grade, stream: level?.stream }),
       ]);
     });
     return Response.json({ pending: true, role: role === "admin" ? "teacher" : "student" }, { status: 201 });

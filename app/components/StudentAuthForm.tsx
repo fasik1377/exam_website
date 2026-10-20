@@ -1,12 +1,12 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, BookOpen, Clock3, GraduationCap, KeyRound, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRight, Atom, BookOpen, BookOpenText, Clock3, GraduationCap, KeyRound, Mail, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import AuthShell, { Field, FormError, SubmitButton } from "@/app/components/AuthShell";
 import { SignedInCard } from "@/app/components/PortalLogin";
 import { useSession } from "@/app/components/useSession";
-import { SUBJECTS } from "@/lib/subjects";
+import { GRADES, STREAMS, SUBJECTS, needsStream, subjectsFor, type Stream } from "@/lib/subjects";
 
 type Role = "student" | "teacher";
 
@@ -14,6 +14,8 @@ type Role = "student" | "teacher";
 export default function StudentAuthForm({ mode, initialRole = "student" }: { mode: "login" | "signup"; initialRole?: Role }) {
   const { user } = useSession();
   const [form, setForm] = useState({ name: "", email: "", password: "", subject: "" });
+  const [grade, setGrade] = useState<string>("");
+  const [stream, setStream] = useState<"" | Stream>("");
   const [role, setRole] = useState<Role>(initialRole);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
@@ -25,6 +27,8 @@ export default function StudentAuthForm({ mode, initialRole = "student" }: { mod
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (signup && role === "student" && !grade) { setError("Choose your grade."); return; }
+    if (signup && role === "student" && needsStream(grade) && !stream) { setError("Choose your stream: Natural Science or Social Science."); return; }
     setLoading(true);
     setError("");
     setPendingNotice(false);
@@ -32,7 +36,7 @@ export default function StudentAuthForm({ mode, initialRole = "student" }: { mod
       const response = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(signup ? { ...form, role } : { email: form.email, password: form.password, remember }),
+        body: JSON.stringify(signup ? { ...form, role, ...(role === "student" ? { grade, stream: needsStream(grade) ? stream : null } : {}) } : { email: form.email, password: form.password, remember }),
       });
       const data = await response.json().catch(() => ({}));
       setLoading(false);
@@ -91,6 +95,38 @@ export default function StudentAuthForm({ mode, initialRole = "student" }: { mod
               {signup && <Field label="Full name" icon={<UserRound size={17} />} required minLength={2} autoComplete="name" value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Abebe Kebede" />}
               <Field label="Email" icon={<Mail size={17} />} required type="email" autoComplete="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="name@example.com" />
               <AnimatePresence initial={false}>
+                {signup && role === "student" && (
+                  <motion.div key="grade" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                    <p className="text-sm font-semibold">Your grade</p>
+                    <div className="mt-2 grid grid-cols-4 gap-2" role="radiogroup" aria-label="Your grade">
+                      {GRADES.map((g) => (
+                        <button key={g} type="button" role="radio" aria-checked={grade === g} onClick={() => { setGrade(g); if (!needsStream(g)) setStream(""); }}
+                          className={`rounded-xl border-2 py-2.5 text-center transition ${grade === g ? "border-royal bg-blue-50 text-royal" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                          <span className="block text-lg font-extrabold leading-5">{g.split(" ")[1]}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Grade</span>
+                        </button>
+                      ))}
+                    </div>
+                    <AnimatePresence initial={false}>
+                      {needsStream(grade) && (
+                        <motion.div key="stream" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                          <p className="mt-4 text-sm font-semibold">Your stream</p>
+                          <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Your stream">
+                            {STREAMS.map((st) => (
+                              <button key={st.id} type="button" role="radio" aria-checked={stream === st.id} onClick={() => setStream(st.id)}
+                                className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 text-left transition ${stream === st.id ? "border-royal bg-blue-50 text-royal" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                                {st.id === "natural" ? <Atom size={18} /> : <BookOpenText size={18} />}
+                                <span><span className="block text-sm font-bold">{st.label}</span><span className="font-amharic text-[11px] opacity-70">{st.amharic}</span></span>
+                              </button>
+                            ))}
+                          </div>
+                          {stream && <p className="mt-2 text-xs text-slate-500">Subjects: {subjectsFor(stream).map((x) => x.name).join(", ")}</p>}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    {grade && !needsStream(grade) && <p className="mt-2 text-xs text-slate-500">Grades 9 and 10 practise all subjects — you&apos;ll choose a stream in Grade 11.</p>}
+                  </motion.div>
+                )}
                 {signup && role === "teacher" && (
                   <motion.label initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="block overflow-hidden text-sm font-semibold">
                     Subject you teach <span className="font-normal text-slate-400">— students find you by subject</span>
