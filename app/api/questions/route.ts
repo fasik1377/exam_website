@@ -22,22 +22,42 @@ export async function GET(request: Request) {
   } catch (error) { return apiError(error); }
 }
 
+type Defaults = { subject: string; grade: string; unit: string; year: string };
+
+/** Validates one incoming question; returns an error message or the document to insert. */
+function toQuestion(input: Record<string, unknown>, defaults: Defaults, teacher: { id: string; name: string }): Omit<DbQuestion, "_id"> | string {
+  const choices = Array.isArray(input.choices) ? input.choices.map((item: unknown) => cleanString(item, 250)) : [];
+  const correctAnswer = Number(input.correctAnswer);
+  const now = new Date();
+  const question: Omit<DbQuestion, "_id"> = {
+    subject: cleanString(input.subject, 60) || defaults.subject, grade: cleanString(input.grade, 30) || defaults.grade,
+    unit: cleanString(input.unit, 60) || defaults.unit, year: cleanString(input.year, 30) || defaults.year || "2016 E.C.",
+    prompt: cleanString(input.question ?? input.prompt, 1000), choices, correctAnswer, explanation: cleanString(input.explanation, 1500),
+    teacherName: teacher.name, createdBy: new ObjectId(teacher.id), published: input.published !== false, createdAt: now, updatedAt: now,
+  };
+  if (!question.subject || !question.grade) return "Choose a subject and grade";
+  if (!question.prompt) return "Question text is missing";
+  if (choices.length < 2 || choices.length > 8 || choices.some((c) => !c)) return "Each question needs 2–8 non-empty choices";
+  if (!Number.isInteger(correctAnswer) || correctAnswer < 0 || correctAnswer >= choices.length) return "Select the correct answer";
+  return question;
+}
+
+/** Publishes one question, or a batch: { questions: [...], subject, grade, unit, year }. */
 export async function POST(request: Request) {
   try {
     const auth = await requireUser(["admin", "super-admin"]);
     if (auth.error) return auth.error;
     const body = await readJson(request);
-    const choices = Array.isArray(body.choices) ? body.choices.map((item: unknown) => cleanString(item, 250)).filter(Boolean) : [];
-    const correctAnswer = Number(body.correctAnswer);
-    const question: Omit<DbQuestion, "_id"> = {
-      subject: cleanString(body.subject, 60), grade: cleanString(body.grade, 30), unit: cleanString(body.unit, 60), year: cleanString(body.year, 30) || "2016 E.C.",
-      prompt: cleanString(body.question, 1000), choices, correctAnswer, explanation: cleanString(body.explanation, 1500), teacherName: auth.user.name,
-      createdBy: new ObjectId(auth.user.id), published: body.published !== false, createdAt: new Date(), updatedAt: new Date(),
-    };
-    if (!question.subject || !question.grade || !question.prompt || choices.length < 2 || !Number.isInteger(correctAnswer) || correctAnswer < 0 || correctAnswer >= choices.length || !question.explanation) {
-      return Response.json({ error: "Complete the question, choices, correct answer, and explanation" }, { status: 400 });
+    const defaults: Defaults = { subject: cleanString(body.subject, 60), grade: cleanString(body.grade, 30), unit: cleanString(body.unit, 60), year: cleanString(body.year, 30) };
+    const items = Array.isArray(body.questions) ? (body.questions as Record<string, unknown>[]) : [body];
+    if (!items.length || items.length > 300) return Response.json({ error: "Send between 1 and 300 questions" }, { status: 400 });
+    const docs: Omit<DbQuestion, "_id">[] = [];
+    for (const [index, item] of items.entries()) {
+      const result = toQuestion(item && typeof item === "object" ? item : {}, defaults, auth.user);
+      if (typeof result === "string") return Response.json({ error: items.length > 1 ? `Question ${index + 1}: ${result}` : result, index }, { status: 400 });
+      docs.push(result);
     }
-    const result = await (await getDb()).collection<DbQuestion>("questions").insertOne(question);
-    return Response.json({ id: result.insertedId.toString() }, { status: 201 });
+    const result = await (await getDb()).collection<DbQuestion>("questions").insertMany(docs);
+    return Response.json({ inserted: result.insertedCount, id: result.insertedIds[0]?.toString() }, { status: 201 });
   } catch (error) { return apiError(error); }
 }

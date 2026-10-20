@@ -1,7 +1,8 @@
 import type { ObjectId } from "mongodb";
 
 export type UserRole = "student" | "admin" | "super-admin";
-export type UserStatus = "active" | "restricted" | "banned";
+/** "pending" = signed up and waiting for super-admin approval; "rejected" = approval refused. */
+export type UserStatus = "pending" | "active" | "restricted" | "banned" | "rejected";
 
 export type DbUser = {
   _id?: ObjectId;
@@ -11,11 +12,15 @@ export type DbUser = {
   role: UserRole;
   status: UserStatus;
   plan: "free" | "monthly" | "yearly" | "teacher";
+  /** Subject a teacher applied to teach. */
+  subject?: string;
+  reviewedAt?: Date;
+  reviewedBy?: ObjectId;
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type PublicUser = Pick<DbUser, "name" | "email" | "role" | "status" | "plan"> & { id: string };
+export type PublicUser = Pick<DbUser, "name" | "email" | "role" | "status" | "plan" | "subject"> & { id: string };
 
 export type DbQuestion = {
   _id?: ObjectId;

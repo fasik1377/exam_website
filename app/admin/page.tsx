@@ -1,15 +1,16 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, CheckCircle2, LoaderCircle, Plus, ShieldCheck, Users, X } from "lucide-react";
+import { BookOpen, CheckCircle2, FileUp, LoaderCircle, MessageCircle, Plus, ShieldCheck, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Brand from "@/app/components/Brand";
 import LogoutButton from "@/app/components/LogoutButton";
 import { useSession } from "@/app/components/useSession";
 import { SUBJECTS as ALL_SUBJECTS } from "@/lib/subjects";
+import ImportDialog from "./ImportDialog";
 
 type Recent = { id: string; question: string; subject: string; grade: string; unit: string };
-type Summary = { questions: number; students: number; attempts: number; recent: Recent[] };
+type Summary = { questions: number; myQuestions: number; students: number; attempts: number; unreadMessages: number; recent: Recent[] };
 
 type Loaded<T> = { data?: T; error?: string };
 
@@ -31,6 +32,7 @@ export default function TeacherDashboard() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loadError, setLoadError] = useState("");
   const [open, setOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [form, setForm] = useState(initial);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -65,8 +67,8 @@ export default function TeacherDashboard() {
 
   const setChoice = (i: number, value: string) => setForm({ ...form, choices: form.choices.map((item, index) => (index === i ? value : item)) });
   const stats = [
-    { value: summary?.questions, label: "Published questions", icon: BookOpen, color: "bg-blue-50 text-royal" },
-    { value: summary?.students, label: "Registered students", icon: Users, color: "bg-amber-50 text-amber-600" },
+    { value: summary?.myQuestions, label: `My questions (of ${summary?.questions ?? "–"} total)`, icon: BookOpen, color: "bg-blue-50 text-royal" },
+    { value: summary?.students, label: "Active students", icon: Users, color: "bg-amber-50 text-amber-600" },
     { value: summary?.attempts, label: "Recorded attempts", icon: CheckCircle2, color: "bg-green-50 text-green-600" },
   ];
 
@@ -77,6 +79,12 @@ export default function TeacherDashboard() {
           <Brand size="sm" subtitle="Teacher dashboard" />
           <div className="flex items-center gap-2">
             {user?.role === "super-admin" && <Link href="/super-admin" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-royal hover:bg-blue-50 sm:inline-flex"><ShieldCheck size={16} /> Platform admin</Link>}
+            {user?.role === "admin" && (
+              <Link href="/chat" className="relative inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-navy hover:bg-slate-100">
+                <MessageCircle size={17} /> <span className="hidden sm:inline">Messages</span>
+                {!!summary?.unreadMessages && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1 text-[10px] font-extrabold text-navy">{summary.unreadMessages}</span>}
+              </Link>
+            )}
             {user && <span className="hidden text-sm font-semibold text-slate-500 md:inline">{user.name}</span>}
             <LogoutButton />
           </div>
@@ -88,10 +96,16 @@ export default function TeacherDashboard() {
           <div>
             <p className="text-xs font-bold uppercase tracking-[.16em] text-royal">Welcome{user ? `, ${user.name.split(" ")[0]}` : ""} 👋</p>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight">Manage the live question bank.</h1>
+            {user?.subject && <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-3 py-1 text-xs font-bold text-amber-800"><BookOpen size={13} /> {user.subject} teacher</p>}
           </div>
-          <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => setOpen(true)} className="btn-shine inline-flex items-center gap-2 rounded-xl bg-navy px-5 py-3 text-sm font-bold text-white shadow-lg shadow-navy/15 hover:bg-royal">
+          <div className="flex flex-wrap gap-2">
+          <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => setImporting(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold shadow-sm hover:border-royal">
+            <FileUp size={17} /> Upload questions
+          </motion.button>
+          <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => { setForm({ ...initial, subject: user?.subject || initial.subject }); setOpen(true); }} className="btn-shine inline-flex items-center gap-2 rounded-xl bg-navy px-5 py-3 text-sm font-bold text-white shadow-lg shadow-navy/15 hover:bg-royal">
             <Plus size={17} /> Add question
           </motion.button>
+          </div>
         </motion.div>
 
         <AnimatePresence>
@@ -126,6 +140,16 @@ export default function TeacherDashboard() {
       </div>
 
       <AnimatePresence>
+        {importing && (
+          <ImportDialog
+            defaultSubject={user?.subject}
+            onClose={() => setImporting(false)}
+            onPublished={(count) => { setImporting(false); setNotice(`${count} question${count === 1 ? "" : "s"} published from your file.`); window.setTimeout(() => setNotice(""), 6000); load(); }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto bg-navy/50 p-4 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
             <motion.form initial={{ opacity: 0, y: 30, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20 }} onSubmit={save} className="mx-auto my-6 max-w-2xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
@@ -153,7 +177,7 @@ export default function TeacherDashboard() {
                   </label>
                 ))}
               </div>
-              <label className="mt-4 block text-sm font-bold">Explanation<textarea required value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+              <label className="mt-4 block text-sm font-bold">Explanation <span className="font-normal text-slate-400">(optional)</span><textarea value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
               {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
               <button disabled={saving} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-4 py-3.5 font-bold text-white hover:bg-royal disabled:opacity-70">
                 {saving ? <><LoaderCircle size={18} className="animate-spin" /> Publishing...</> : "Publish question"}

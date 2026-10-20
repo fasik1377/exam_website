@@ -168,7 +168,7 @@ export default function Home() {
               <SectionLabel tone="light">Student support</SectionLabel>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Stuck on a question? Ask a teacher.</h2>
               <p className="mt-4 max-w-md leading-7 text-white/70">Message a subject teacher for help with a question, an explanation, or a study plan — and get answers in plain language.</p>
-              <Link href="/signup" className="btn-shine mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-navy"><MessageCircle size={18} /> Join to chat with teachers</Link>
+              <Link href="/chat" className="btn-shine mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-navy"><MessageCircle size={18} /> Chat with a teacher</Link>
             </div>
             <div className="relative"><SupportChat /></div>
           </div>

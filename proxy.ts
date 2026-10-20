@@ -1,11 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE = "temarinet_session";
 
+// Signed-out visitors to a staff area go to that area's login, remembering where they were headed.
 export function proxy(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
-  if (!hasSession && (path.startsWith("/admin") && path !== "/admin/login")) return NextResponse.redirect(new URL("/admin/login", request.url));
-  if (!hasSession && (path.startsWith("/super-admin") && path !== "/super-admin/login")) return NextResponse.redirect(new URL("/super-admin/login", request.url));
+  const { pathname, search } = request.nextUrl;
+  if (request.cookies.get(SESSION_COOKIE)?.value) return NextResponse.next();
+  for (const area of ["/super-admin", "/admin"]) {
+    if (pathname.startsWith(area) && pathname !== `${area}/login`) {
+      const login = new URL(`${area}/login`, request.url);
+      login.searchParams.set("next", pathname + search);
+      return NextResponse.redirect(login);
+    }
+  }
   return NextResponse.next();
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, ChevronRight, Lock, Sparkles, Timer, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronRight, Lock, MessageCircle, Sparkles, Timer, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import Brand from "@/app/components/Brand";
@@ -66,7 +66,7 @@ function Exam() {
         <div className="mt-6 grid gap-3">{question.choices.map((choice, i) => <button key={`${choice}-${i}`} disabled={selected !== null || timeLeft === 0} onClick={() => answer(i)} className={`rounded-xl border p-4 text-left text-sm font-semibold transition-all ${selected === i ? (correct ? "border-green-400 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-700") : selected !== null && i === question.answer ? "border-green-400 bg-green-50" : "border-slate-200 hover:-translate-y-0.5 hover:border-royal hover:bg-blue-50/50"}`}>{String.fromCharCode(65 + i)}. {choice}{selected !== null && i === question.answer && <CheckCircle2 className="float-right text-green-700" size={18} />}</button>)}</div>
         </motion.div></AnimatePresence>
         {timeLeft === 0 && selected === null && <p className="mt-5 rounded-lg bg-red-50 p-4 text-sm font-semibold text-red-700">Time is up. Continue to the next question.</p>}
-        {selected !== null && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`mt-6 rounded-2xl p-5 ${correct ? "bg-green-50" : "bg-amber-50"}`}><p className="font-bold">{correct ? "Correct. Well done." : "Review the explanation"}</p><p className="mt-2 text-sm leading-6 text-slate-600">{requiresSubscription ? "Subscribe to view the full teacher explanation." : question.explanation}</p><button onClick={() => requiresSubscription && setShowSubscribe(true)} className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-royal hover:underline"><Sparkles size={14} />Explanation by {question.teacher}</button></motion.div>}
+        {selected !== null && <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`mt-6 rounded-2xl p-5 ${correct ? "bg-green-50" : "bg-amber-50"}`}><p className="font-bold">{correct ? "Correct. Well done." : "Review the explanation"}</p><p className="mt-2 text-sm leading-6 text-slate-600">{requiresSubscription ? "Subscribe to view the full teacher explanation." : question.explanation || "No explanation was provided for this question."}</p><button onClick={() => requiresSubscription && setShowSubscribe(true)} className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-royal hover:underline"><Sparkles size={14} />Explanation by {question.teacher}</button>{user && <Link href={`/chat?subject=${encodeURIComponent(subject)}`} className="ml-4 inline-flex items-center gap-1.5 text-xs font-bold text-navy hover:underline"><MessageCircle size={14} />Ask a {subject} teacher</Link>}</motion.div>}
         <div className="mt-7 flex justify-end"><button disabled={(selected === null && timeLeft > 0) || index === questions.length - 1} onClick={next} className="inline-flex items-center gap-2 rounded-lg bg-navy px-5 py-3 text-sm font-bold text-white disabled:opacity-40">Next question <ChevronRight size={17} /></button></div>
       </>}
     </motion.section></div>

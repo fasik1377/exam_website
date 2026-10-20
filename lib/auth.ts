@@ -48,7 +48,7 @@ export async function deleteSession() {
 }
 
 export function toPublicUser(user: DbUser & { _id: ObjectId }): PublicUser {
-  return { id: user._id.toString(), name: user.name, email: user.email, role: user.role, status: user.status, plan: user.plan };
+  return { id: user._id.toString(), name: user.name, email: user.email, role: user.role, status: user.status, plan: user.plan, subject: user.subject };
 }
 
 export async function getCurrentUser(): Promise<PublicUser | null> {
@@ -90,6 +90,9 @@ async function setupDatabase() {
     db.collection("sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     db.collection("questions").createIndex({ grade: 1, subject: 1, published: 1 }),
     db.collection("attempts").createIndex({ userId: 1, createdAt: -1 }),
+    db.collection("conversations").createIndex({ studentId: 1, teacherId: 1 }, { unique: true }),
+    db.collection("conversations").createIndex({ teacherId: 1, lastMessageAt: -1 }),
+    db.collection("messages").createIndex({ conversationId: 1, createdAt: -1 }),
   ]);
   await bootstrapUser("super-admin", "SUPER_ADMIN");
   await bootstrapUser("admin", "ADMIN");

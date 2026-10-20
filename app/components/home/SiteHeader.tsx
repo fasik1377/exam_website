@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "framer-motion";
-import { LayoutDashboard, Menu, X } from "lucide-react";
+import { LayoutDashboard, Menu, MessageCircle, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import Brand from "@/app/components/Brand";
@@ -39,6 +39,11 @@ export default function SiteHeader() {
         <div className="hidden items-center gap-2 sm:flex">
           {user ? (
             <>
+              {(user.role === "student" || user.role === "admin") && (
+                <Link href="/chat" className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold ${light ? "text-navy hover:bg-slate-100" : "text-white hover:bg-white/10"}`}>
+                  <MessageCircle size={16} /> <span className="hidden lg:inline">{user.role === "student" ? "Ask a teacher" : "Messages"}</span>
+                </Link>
+              )}
               <Link href={dashboard} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold ${light ? "text-navy hover:bg-slate-100" : "text-white hover:bg-white/10"}`}>
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-gold text-xs font-extrabold text-navy">{user.name.charAt(0).toUpperCase()}</span>
                 <span className="hidden lg:inline">{dashboardLabel}</span>

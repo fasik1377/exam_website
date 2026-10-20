@@ -1,17 +1,24 @@
 "use client";
-import { ArrowRight, KeyRound, Mail, UserRound } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowRight, BookOpen, Clock3, GraduationCap, KeyRound, Mail, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import AuthShell, { Field, FormError, SubmitButton } from "@/app/components/AuthShell";
 import { dashboardFor, useSession } from "@/app/components/useSession";
+import { SUBJECTS } from "@/lib/subjects";
 
-/** General sign-in (students, teachers and admins — each is routed to their own dashboard) and student sign-up. */
+type Role = "student" | "teacher";
+
+/** General sign-in (every role is routed to its own dashboard) and student/teacher registration. */
 export default function StudentAuthForm({ mode }: { mode: "login" | "signup" }) {
   const { user } = useSession();
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", subject: "" });
+  const [role, setRole] = useState<Role>("student");
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
+  const [pendingNotice, setPendingNotice] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState<Role | null>(null);
   const signup = mode === "signup";
 
   // Already signed in? Send them straight to where they belong.
@@ -23,18 +30,21 @@ export default function StudentAuthForm({ mode }: { mode: "login" | "signup" }) 
     event.preventDefault();
     setLoading(true);
     setError("");
+    setPendingNotice(false);
     try {
       const response = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(signup ? form : { email: form.email, password: form.password, remember }),
+        body: JSON.stringify(signup ? { ...form, role } : { email: form.email, password: form.password, remember }),
       });
       const data = await response.json().catch(() => ({}));
+      setLoading(false);
       if (!response.ok) {
         setError(data.error || "Unable to continue. Please try again.");
-        setLoading(false);
+        setPendingNotice(data.status === "pending");
         return;
       }
+      if (signup) return setSubmitted(role);
       window.location.assign(data.redirect || "/#grades");
     } catch {
       setError("Network error — check your connection and try again.");
@@ -46,42 +56,105 @@ export default function StudentAuthForm({ mode }: { mode: "login" | "signup" }) 
 
   return (
     <AuthShell
-      eyebrow={signup ? "Join for free" : "Welcome back"}
+      eyebrow={signup ? "Join እውቀትNET" : "Welcome back"}
       title={signup ? "Start preparing for your national exam today." : "Pick up right where you left off."}
-      description="Practise with real Grade 9–12 questions, get instant feedback, and learn from clear teacher explanations."
-      points={["Natural & Social Science exam subjects", "Step-by-step teacher explanations", "Your progress saved to your account"]}
+      description="Practise real Grade 9–12 questions, get instant feedback, and learn from clear teacher explanations."
+      points={["Natural & Social Science exam subjects", "Step-by-step teacher explanations", "Every account is reviewed and approved for safety"]}
     >
-      <h2 className="text-3xl font-extrabold tracking-tight">{signup ? "Create your account" : "Sign in"}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-500">
-        {signup ? "It takes less than a minute. No payment needed to start." : "Students, teachers and administrators can all sign in here."}
-      </p>
+      <AnimatePresence mode="wait">
+        {submitted ? (
+          <PendingApproval key="done" role={submitted} email={form.email} />
+        ) : (
+          <motion.div key="form" exit={{ opacity: 0, y: -10 }}>
+            <h2 className="text-3xl font-extrabold tracking-tight">{signup ? "Create your account" : "Sign in"}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {signup ? "Register as a student or a teacher. A platform administrator approves every new account." : "Students, teachers and administrators can all sign in here."}
+            </p>
 
-      <form onSubmit={submit} className="mt-8 grid gap-4">
-        {signup && <Field label="Full name" icon={<UserRound size={17} />} required minLength={2} autoComplete="name" value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Abebe Kebede" />}
-        <Field label="Email" icon={<Mail size={17} />} required type="email" autoComplete="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="name@example.com" />
-        <Field label="Password" icon={<KeyRound size={17} />} required minLength={signup ? 8 : undefined} type="password" autoComplete={signup ? "new-password" : "current-password"} value={form.password} onChange={(e) => update("password", e.target.value)} placeholder={signup ? "At least 8 characters" : "Enter your password"} />
-        {signup && <PasswordMeter password={form.password} />}
-        {!signup && (
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-royal" /> Keep me signed in for 14 days
-          </label>
+            <form onSubmit={submit} className="mt-8 grid gap-4">
+              {signup && (
+                <div>
+                  <p className="text-sm font-semibold">I am a</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-1.5" role="radiogroup">
+                    {([["student", "Student", GraduationCap], ["teacher", "Teacher", BookOpen]] as const).map(([value, label, Icon]) => (
+                      <button key={value} type="button" role="radio" aria-checked={role === value} onClick={() => setRole(value)} className={`relative flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-colors ${role === value ? "text-white" : "text-slate-500 hover:text-navy"}`}>
+                        {role === value && <motion.span layoutId="role-pill" className="absolute inset-0 rounded-xl bg-navy" transition={{ type: "spring", stiffness: 350, damping: 30 }} />}
+                        <Icon size={16} className="relative" /><span className="relative">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {signup && <Field label="Full name" icon={<UserRound size={17} />} required minLength={2} autoComplete="name" value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="Abebe Kebede" />}
+              <Field label="Email" icon={<Mail size={17} />} required type="email" autoComplete="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="name@example.com" />
+              <AnimatePresence initial={false}>
+                {signup && role === "teacher" && (
+                  <motion.label initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="block overflow-hidden text-sm font-semibold">
+                    Subject you teach <span className="font-normal text-slate-400">— students find you by subject</span>
+                    <select required value={form.subject} onChange={(e) => update("subject", e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 font-normal outline-none focus:border-royal focus:ring-4 focus:ring-royal/10">
+                      <option value="" disabled>Select a subject</option>
+                      {SUBJECTS.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
+                    </select>
+                  </motion.label>
+                )}
+              </AnimatePresence>
+              <Field label="Password" icon={<KeyRound size={17} />} required minLength={signup ? 8 : undefined} type="password" autoComplete={signup ? "new-password" : "current-password"} value={form.password} onChange={(e) => update("password", e.target.value)} placeholder={signup ? "At least 8 characters" : "Enter your password"} />
+              {signup && <PasswordMeter password={form.password} />}
+              {!signup && (
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-royal" /> Keep me signed in for 14 days
+                </label>
+              )}
+              {pendingNotice ? (
+                <motion.p role="status" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                  <Clock3 size={18} className="mt-0.5 shrink-0" />{error}
+                </motion.p>
+              ) : <FormError message={error} />}
+              <SubmitButton loading={loading} loadingText={signup ? "Submitting..." : "Signing in..."}>
+                {signup ? `Register as ${role}` : "Sign in"} <ArrowRight size={17} />
+              </SubmitButton>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-slate-500">
+              {signup ? "Already registered?" : "New to እውቀትNET?"}{" "}
+              <Link className="font-bold text-royal hover:underline" href={signup ? "/login" : "/signup"}>{signup ? "Sign in" : "Create an account"}</Link>
+            </p>
+            {!signup && (
+              <p className="mt-3 text-center text-xs text-slate-400">
+                Staff portals: <Link href="/admin/login" className="font-semibold hover:text-royal">Teacher</Link> · <Link href="/super-admin/login" className="font-semibold hover:text-royal">Platform admin</Link>
+              </p>
+            )}
+          </motion.div>
         )}
-        <FormError message={error} />
-        <SubmitButton loading={loading} loadingText={signup ? "Creating account..." : "Signing in..."}>
-          {signup ? "Create account" : "Sign in"} <ArrowRight size={17} />
-        </SubmitButton>
-      </form>
-
-      <p className="mt-6 text-center text-sm text-slate-500">
-        {signup ? "Already registered?" : "New to እውቀትNET?"}{" "}
-        <Link className="font-bold text-royal hover:underline" href={signup ? "/login" : "/signup"}>{signup ? "Sign in" : "Create a free account"}</Link>
-      </p>
-      {!signup && (
-        <p className="mt-3 text-center text-xs text-slate-400">
-          Staff portals: <Link href="/admin/login" className="font-semibold hover:text-royal">Teacher</Link> · <Link href="/super-admin/login" className="font-semibold hover:text-royal">Platform admin</Link>
-        </p>
-      )}
+      </AnimatePresence>
     </AuthShell>
+  );
+}
+
+function PendingApproval({ role, email }: { role: Role; email: string }) {
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
+      <div className="relative mx-auto grid h-24 w-24 place-items-center">
+        <motion.span className="absolute inset-0 rounded-full border-4 border-gold/30 border-t-gold" animate={{ rotate: 360 }} transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }} />
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-gold/15 text-gold"><Clock3 size={30} /></span>
+      </div>
+      <h2 className="mt-6 text-2xl font-extrabold tracking-tight">Registration received!</h2>
+      <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-500">
+        Your {role} account for <span className="font-bold text-navy">{email}</span> is now waiting for approval by the platform administrator.
+      </p>
+      <ol className="mx-auto mt-7 grid max-w-sm gap-3 text-left text-sm">
+        {[
+          { icon: <ShieldCheck size={16} />, text: "Account submitted", done: true },
+          { icon: <Clock3 size={16} />, text: "Administrator reviews your registration", done: false },
+          { icon: <ArrowRight size={16} />, text: role === "teacher" ? "Sign in and start publishing questions" : "Sign in and start practising", done: false },
+        ].map((step, i) => (
+          <motion.li key={step.text} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + i * 0.12 }} className={`flex items-center gap-3 rounded-xl border p-3 ${step.done ? "border-green-200 bg-green-50 text-green-800" : "border-slate-200 bg-white text-slate-600"}`}>
+            <span className={`grid h-7 w-7 place-items-center rounded-full ${step.done ? "bg-green-500 text-white" : "bg-slate-100"}`}>{step.icon}</span>{step.text}
+          </motion.li>
+        ))}
+      </ol>
+      <Link href="/" className="mt-8 inline-flex items-center gap-2 rounded-xl bg-navy px-5 py-3 text-sm font-bold text-white hover:bg-royal">Back to home <ArrowRight size={16} /></Link>
+    </motion.div>
   );
 }
 

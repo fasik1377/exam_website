@@ -10,6 +10,13 @@ const PORTAL_ROLES: Record<string, UserRole[]> = {
   "super-admin": ["super-admin"],
 };
 
+const STATUS_MESSAGE: Record<string, string> = {
+  pending: "Your account is waiting for approval by the platform administrator. You can sign in as soon as it is approved.",
+  rejected: "Your registration was not approved. Please contact the platform administrator.",
+  restricted: "This account is restricted. Please contact the platform administrator.",
+  banned: "This account has been banned. Please contact the platform administrator.",
+};
+
 export async function POST(request: Request) {
   try {
     await ensureDatabase();
@@ -20,7 +27,7 @@ export async function POST(request: Request) {
     const allowedRoles = typeof body.role === "string" ? PORTAL_ROLES[body.role] : undefined;
     const user = await (await getDb()).collection<DbUser>("users").findOne({ email });
     if (!user || !(await verifyPassword(password, user.passwordHash))) return Response.json({ error: "Invalid email or password" }, { status: 401 });
-    if (user.status !== "active") return Response.json({ error: `This account is ${user.status}. Please contact the platform administrator.` }, { status: 403 });
+    if (user.status !== "active") return Response.json({ error: STATUS_MESSAGE[user.status] ?? "This account cannot sign in.", status: user.status }, { status: 403 });
     if (allowedRoles && !allowedRoles.includes(user.role)) {
       return Response.json({ error: "This account cannot use this portal. Use the main sign-in page instead.", redirect: "/login" }, { status: 403 });
     }

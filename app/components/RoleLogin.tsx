@@ -5,6 +5,12 @@ import { useEffect, useState, type FormEvent } from "react";
 import AuthShell, { Field, FormError, SubmitButton } from "@/app/components/AuthShell";
 import { useSession } from "@/app/components/useSession";
 
+/** Where to go after signing in: a safe "next" path inside this portal, or the portal home. */
+function destination(home: string) {
+  const next = new URLSearchParams(window.location.search).get("next") || "";
+  return next.startsWith(home) && !next.startsWith("//") ? next : home;
+}
+
 type Props = { role: "Admin" | "Super Admin"; eyebrow: string; title: string; description: string; accent?: "teal" | "sky"; permissions: string[] };
 
 export default function RoleLogin({ role, eyebrow, title, description, permissions }: Props) {
@@ -20,7 +26,7 @@ export default function RoleLogin({ role, eyebrow, title, description, permissio
   // Skip the form if the current session can already use this portal.
   useEffect(() => {
     if (!user) return;
-    if (user.role === "super-admin" || (role === "Admin" && user.role === "admin")) window.location.replace(home);
+    if (user.role === "super-admin" || (role === "Admin" && user.role === "admin")) window.location.replace(destination(home));
   }, [user, role, home]);
 
   async function submit(event: FormEvent) {
@@ -35,7 +41,7 @@ export default function RoleLogin({ role, eyebrow, title, description, permissio
         setLoading(false);
         return;
       }
-      window.location.assign(home);
+      window.location.assign(destination(home));
     } catch {
       setError("Network error — check your connection and try again.");
       setLoading(false);

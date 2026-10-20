@@ -8,6 +8,7 @@ export type SessionUser = {
   role: "student" | "admin" | "super-admin";
   status: string;
   plan: "free" | "monthly" | "yearly" | "teacher";
+  subject?: string;
 };
 
 type SessionState = { user: SessionUser | null; loading: boolean; unavailable: boolean };
