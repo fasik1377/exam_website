@@ -1,12 +1,12 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, CheckCircle2, Download, FileText, LoaderCircle, Trash2, UploadCloud, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Download, FileText, ListChecks, LoaderCircle, ToggleLeft, Trash2, UploadCloud, X } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
-import { TEMPLATE, validate, type ParsedQuestion } from "@/lib/questionParser";
+import { TEMPLATE, convertType, validate, type ParsedQuestion, type QuestionType } from "@/lib/questionParser";
 import { SUBJECTS } from "@/lib/subjects";
 
 const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
-const ACCEPT = ".docx,.pdf,.txt";
+const ACCEPT = ".doc,.docx,.pdf,.txt";
 
 type Props = { defaultSubject?: string; onClose: () => void; onPublished: (count: number) => void };
 
@@ -26,8 +26,8 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
 
   async function read(file: File) {
     setError("");
-    if (!/\.(docx|pdf|txt)$/i.test(file.name)) {
-      setError(/\.doc$/i.test(file.name) ? "Old .doc files can't be read. In Word choose File → Save As → Word Document (.docx), then upload again." : "Upload a .docx, .pdf or .txt file.");
+    if (!/\.(docx?|pdf|txt)$/i.test(file.name)) {
+      setError("Upload a Word (.doc / .docx), PDF or .txt file.");
       return;
     }
     setFileName(file.name);
@@ -49,6 +49,10 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
     if (file) read(file);
   }
 
+  const setType = (index: number, type: QuestionType) =>
+    setQuestions((list) => list.map((q, i) => (i === index ? convertType(q, type) : q)));
+  const trueFalseCount = questions.filter((q) => q.type === "truefalse").length;
+
   const update = (index: number, change: Partial<ParsedQuestion>) =>
     setQuestions((list) => list.map((q, i) => (i === index ? validate({ ...q, ...change }) : q)));
 
@@ -58,7 +62,7 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
     const response = await fetch("/api/questions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...meta, unit: meta.unit || "General", questions: ready.map((q) => ({ question: q.prompt, choices: q.choices, correctAnswer: q.correctAnswer, explanation: q.explanation })) }),
+      body: JSON.stringify({ ...meta, unit: meta.unit || "General", questions: ready.map((q) => ({ type: q.type, question: q.prompt, choices: q.choices, correctAnswer: q.correctAnswer, explanation: q.explanation })) }),
     }).catch(() => null);
     const data = await response?.json().catch(() => ({}));
     setPublishing(false);
@@ -80,7 +84,7 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
           <div>
             <p className="text-xs font-bold uppercase tracking-[.16em] text-royal">Bulk upload</p>
             <h2 className="mt-1 text-2xl font-extrabold">Upload questions from a file</h2>
-            <p className="mt-1 text-sm text-slate-500">Word (.docx), PDF or text files. You review every question before it is published.</p>
+            <p className="mt-1 text-sm text-slate-500">Word (.doc / .docx), PDF or text files — multiple choice and true/false. You review every question before it is published.</p>
           </div>
           <button type="button" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-full hover:bg-slate-100" aria-label="Close"><X size={20} /></button>
         </div>
@@ -117,7 +121,7 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
                   <>
                     <motion.span animate={{ y: [0, -6, 0] }} transition={{ duration: 2, repeat: Infinity }} className="grid h-16 w-16 place-items-center rounded-2xl bg-royal/10 text-royal"><UploadCloud size={32} /></motion.span>
                     <p className="mt-4 font-bold">Drop your file here or click to choose</p>
-                    <p className="mt-1 text-sm text-slate-500">.docx · .pdf · .txt — up to 10 MB</p>
+                    <p className="mt-1 text-sm text-slate-500">.doc · .docx · .pdf · .txt — up to 10 MB</p>
                   </>
                 )}
               </button>
@@ -129,11 +133,12 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
                   <button type="button" onClick={downloadTemplate} className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-royal shadow-sm ring-1 ring-slate-200 hover:ring-royal"><Download size={14} /> Download template</button>
                 </div>
                 <div className="mt-3 grid gap-4 text-sm text-slate-600 sm:grid-cols-2">
-                  <pre className="overflow-x-auto rounded-xl bg-white p-3 font-mono text-xs leading-5 text-navy ring-1 ring-slate-200">{`1. What is 2 + 3?\nA. 4\nB. 5\nC. 6\nD. 7\nAnswer: B\nExplanation: 2 + 3 = 5`}</pre>
+                  <pre className="overflow-x-auto rounded-xl bg-white p-3 font-mono text-xs leading-5 text-navy ring-1 ring-slate-200">{`1. What is 2 + 3?\nA. 4\nB. 5\nC. 6\nD. 7\nAnswer: B\n\nPart II: True or False\n2. Every square is a rectangle.\nAnswer: True`}</pre>
                   <ul className="grid content-start gap-1.5">
                     <li>• Number each question: <b>1.</b> <b>1)</b> <b>Q1.</b></li>
                     <li>• Start choices with <b>A.</b> <b>B)</b> or <b>(c)</b> — one line or all on one line</li>
                     <li>• Give the answer with <b>Answer: B</b>, a <b>*</b> before the right choice, or an <b>Answer key</b> list at the end</li>
+                    <li>• True/false: put them under a <b>True or False</b> heading, add <b>(True/False)</b>, or answer with <b>Answer: True</b> / <b>F</b></li>
                     <li>• <b>Explanation:</b> is optional</li>
                   </ul>
                 </div>
@@ -146,7 +151,7 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold">{fileName}</p>
                   <p className="text-sm text-slate-500">
-                    {questions.length} found · <span className="font-semibold text-green-700">{ready.length} ready</span>
+                    {questions.length} found ({questions.length - trueFalseCount} multiple choice · {trueFalseCount} true/false) · <span className="font-semibold text-green-700">{ready.length} ready</span>
                     {questions.length - ready.length > 0 && <> · <span className="font-semibold text-amber-700">{questions.length - ready.length} need attention</span></>}
                   </p>
                 </div>
@@ -162,15 +167,32 @@ export default function ImportDialog({ defaultSubject, onClose, onPublished }: P
                       <textarea value={q.prompt} onChange={(e) => update(i, { prompt: e.target.value })} rows={2} className="min-h-12 flex-1 rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-semibold" />
                       <button type="button" onClick={() => setQuestions((list) => list.filter((_, j) => j !== i))} className="mt-1.5 rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove question"><Trash2 size={16} /></button>
                     </div>
-                    <div className="mt-2 grid gap-2 pl-8 sm:grid-cols-2">
-                      {q.choices.map((choice, c) => (
-                        <label key={c} className={`flex items-center gap-2 rounded-xl border bg-white px-2.5 py-1.5 text-sm ${q.correctAnswer === c ? "border-green-400 ring-2 ring-green-100" : "border-slate-200"}`}>
-                          <input type="radio" name={`answer-${i}`} checked={q.correctAnswer === c} onChange={() => update(i, { correctAnswer: c })} className="accent-green-600" aria-label={`Mark choice ${String.fromCharCode(65 + c)} correct`} />
-                          <span className="text-xs font-bold text-slate-400">{String.fromCharCode(65 + c)}</span>
-                          <input value={choice} onChange={(e) => update(i, { choices: q.choices.map((v, k) => (k === c ? e.target.value : v)) })} className="min-w-0 flex-1 outline-none" />
-                        </label>
+                    <div className="mt-2 flex gap-1.5 pl-8">
+                      {([["mcq", "Multiple choice", ListChecks], ["truefalse", "True / False", ToggleLeft]] as const).map(([value, label, Icon]) => (
+                        <button key={value} type="button" onClick={() => setType(i, value)} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${q.type === value ? "bg-navy text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                          <Icon size={12} />{label}
+                        </button>
                       ))}
                     </div>
+                    {q.type === "truefalse" ? (
+                      <div className="mt-2 grid grid-cols-2 gap-2 pl-8">
+                        {["True", "False"].map((label, c) => (
+                          <button key={label} type="button" onClick={() => update(i, { correctAnswer: c })} className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2 text-sm font-extrabold ${q.correctAnswer === c ? (c === 0 ? "border-green-500 bg-green-50 text-green-700" : "border-red-400 bg-red-50 text-red-600") : "border-slate-200 bg-white text-slate-400"}`}>
+                            {c === 0 ? <Check size={15} /> : <X size={15} />}{label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2 grid gap-2 pl-8 sm:grid-cols-2">
+                        {q.choices.map((choice, c) => (
+                          <label key={c} className={`flex items-center gap-2 rounded-xl border bg-white px-2.5 py-1.5 text-sm ${q.correctAnswer === c ? "border-green-400 ring-2 ring-green-100" : "border-slate-200"}`}>
+                            <input type="radio" name={`answer-${i}`} checked={q.correctAnswer === c} onChange={() => update(i, { correctAnswer: c })} className="accent-green-600" aria-label={`Mark choice ${String.fromCharCode(65 + c)} correct`} />
+                            <span className="text-xs font-bold text-slate-400">{String.fromCharCode(65 + c)}</span>
+                            <input value={choice} onChange={(e) => update(i, { choices: q.choices.map((v, k) => (k === c ? e.target.value : v)) })} className="min-w-0 flex-1 outline-none" />
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     <div className="mt-2 pl-8">
                       <input value={q.explanation} onChange={(e) => update(i, { explanation: e.target.value })} placeholder="Explanation (optional)" className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
                       {q.issues.length > 0 && <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-amber-700"><AlertTriangle size={13} />{q.issues.join(" · ")}</p>}

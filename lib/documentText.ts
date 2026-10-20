@@ -1,5 +1,6 @@
 import mammoth from "mammoth";
 import { extractText } from "unpdf";
+import WordExtractor from "word-extractor";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -49,7 +50,15 @@ function htmlToLines(html: string) {
 export async function documentText(fileName: string, bytes: ArrayBuffer): Promise<{ text: string; notes: string[] }> {
   const ext = fileName.toLowerCase().split(".").pop() ?? "";
   const notes: string[] = [];
-  if (ext === "doc") throw new UnsupportedDocumentError("Old .doc files can't be read. In Word choose File → Save As → Word Document (.docx), or export as PDF, then upload again.");
+  if (ext === "doc") {
+    // Legacy Word 97–2003 binary format.
+    try {
+      const doc = await new WordExtractor().extract(Buffer.from(bytes));
+      return { text: doc.getBody(), notes: ["Automatic numbering in old .doc files can't always be read — if questions are missing, number them by hand or save as .docx."] };
+    } catch {
+      throw new UnsupportedDocumentError("This .doc file could not be read. In Word choose File → Save As → Word Document (.docx), then upload again.");
+    }
+  }
   if (ext === "docx") {
     const { value } = await mammoth.convertToHtml({ buffer: Buffer.from(bytes) });
     if (value.includes("<img")) notes.push("Images or equation objects in the document were not imported — add them to the question text if needed.");
@@ -61,5 +70,5 @@ export async function documentText(fileName: string, bytes: ArrayBuffer): Promis
     return { text, notes };
   }
   if (ext === "txt") return { text: new TextDecoder().decode(bytes), notes };
-  throw new UnsupportedDocumentError("Upload a .docx, .pdf or .txt file.");
+  throw new UnsupportedDocumentError("Upload a .doc, .docx, .pdf or .txt file.");
 }

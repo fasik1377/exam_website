@@ -175,3 +175,160 @@ export function Meter({ value, label }: { value: number; label: string }) {
     </div>
   );
 }
+
+/** Tiny trend line for stat tiles. */
+export function Sparkline({ values, color = SERIES.blue }: { values: number[]; color?: string }) {
+  const w = 96, h = 30;
+  const max = Math.max(1, ...values);
+  const pts = values.map((v, i) => [(i / Math.max(1, values.length - 1)) * w, h - 3 - (v / max) * (h - 6)] as const);
+  const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const last = pts[pts.length - 1];
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="overflow-visible">
+      <path d={`${line} L${w},${h} L0,${h} Z`} fill={color} opacity={0.1} />
+      <motion.path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1 }} />
+      {last && <circle cx={last[0]} cy={last[1]} r={2.5} fill={color} />}
+    </svg>
+  );
+}
+
+type StackKey = { key: string; label: string; color: string };
+
+/** Stacked daily bars (first key at the bottom), with legend and hover tooltip. */
+export function DailyStacked({ data, keys }: { data: ({ date: string } & Record<string, number | string>)[]; keys: StackKey[] }) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number | null>(null);
+  const height = 200, pad = { top: 10, right: 6, bottom: 26, left: 28 };
+  const innerW = Math.max(0, width - pad.left - pad.right), innerH = height - pad.top - pad.bottom;
+  const totals = data.map((d) => keys.reduce((s, k) => s + Number(d[k.key] || 0), 0));
+  const max = niceMax(Math.max(0, ...totals));
+  const slot = innerW / Math.max(1, data.length);
+  const barW = Math.max(4, Math.min(26, slot * 0.62));
+  const y = (v: number) => pad.top + innerH - (v / max) * innerH;
+  const sums = keys.map((k) => data.reduce((s, d) => s + Number(d[k.key] || 0), 0));
+
+  return (
+    <div>
+      <ul className="mb-3 flex flex-wrap gap-4 text-sm">
+        {keys.map((k, i) => (
+          <li key={k.key} className="flex items-center gap-2 text-slate-600"><span className="h-3 w-3 rounded-sm" style={{ background: k.color }} />{k.label}<span className="font-bold tabular-nums text-navy">{sums[i]}</span></li>
+        ))}
+      </ul>
+      <div ref={ref} className="relative">
+        {width > 0 && (
+          <svg width={width} height={height} onPointerLeave={() => setHover(null)} role="img" aria-label={`Daily ${keys.map((k) => k.label).join(" and ")}`}>
+            {[0, max / 2, max].map((t) => (
+              <g key={t}>
+                <line x1={pad.left} x2={width - pad.right} y1={y(t)} y2={y(t)} stroke="#e2e8f0" strokeDasharray={t ? "3 4" : undefined} />
+                <text x={pad.left - 8} y={y(t)} dy="0.32em" textAnchor="end" className="fill-slate-400 text-[10px] tabular-nums">{Math.round(t)}</text>
+              </g>
+            ))}
+            {data.map((d, i) => {
+              const cx = pad.left + slot * i + slot / 2;
+              const present = keys.filter((k) => Number(d[k.key] || 0) > 0);
+              let base = 0;
+              const last = data.length - 1;
+              return (
+                <g key={d.date} onPointerEnter={() => setHover(i)}>
+                  <rect x={cx - slot / 2} y={pad.top} width={slot} height={innerH} fill={hover === i ? "#f1f5f9" : "transparent"} />
+                  {present.map((k, pi) => {
+                    const v = Number(d[k.key]);
+                    const top = y(base + v), bottom = y(base);
+                    base += v;
+                    // 2px surface gap between stacked segments; only the top segment gets rounded ends.
+                    const h = Math.max(1, bottom - top - (pi > 0 ? 2 : 0));
+                    return (
+                      <motion.rect key={k.key} x={cx - barW / 2} width={barW} rx={pi === present.length - 1 ? 4 : 0} fill={k.color}
+                        initial={{ y: y(0), height: 0 }} animate={{ y: top, height: h }} transition={{ duration: 0.6, delay: i * 0.02 }} />
+                    );
+                  })}
+                  {(i % 3 === 0 && i <= last - 2) || i === last ? (
+                    <text x={cx} y={height - 8} textAnchor={i === last ? "end" : "middle"} className="fill-slate-400 text-[10px]">{shortDate(d.date)}</text>
+                  ) : null}
+                </g>
+              );
+            })}
+          </svg>
+        )}
+        {hover !== null && width > 0 && (
+          <div className="pointer-events-none absolute top-0 rounded-xl bg-navy px-3 py-2 text-xs text-white shadow-lg" style={{ left: Math.min(Math.max(pad.left + slot * hover + slot / 2 - 70, 0), width - 140), width: 140 }}>
+            <p className="text-white/60">{shortDate(data[hover].date)}</p>
+            {keys.map((k) => <p key={k.key} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ background: k.color }} />{k.label}: <b>{Number(data[hover][k.key] || 0)}</b></p>)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const RAMP = ["#f1f5f9", "#b7d3f6", "#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+type Cell = { day: number; hour: number; count: number };
+
+/** Weekday × hour activity grid in one sequential hue. */
+export function Heatmap({ cells }: { cells: Cell[] }) {
+  const [hover, setHover] = useState<Cell | null>(null);
+  const grid = new Map(cells.map((c) => [`${c.day}-${c.hour}`, c.count]));
+  const max = Math.max(0, ...cells.map((c) => c.count));
+  const step = (v: number) => (v === 0 ? 0 : Math.min(RAMP.length - 1, 1 + Math.floor((v / max) * (RAMP.length - 1.01))));
+  const busiest = cells.reduce<Cell | null>((best, c) => (!best || c.count > best.count ? c : best), null);
+
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[560px] grid-cols-[2.5rem_repeat(24,minmax(0,1fr))] gap-[3px]" onPointerLeave={() => setHover(null)}>
+          <span />
+          {Array.from({ length: 24 }, (_, h) => <span key={h} className="text-center text-[9px] text-slate-400">{h % 3 === 0 ? h : ""}</span>)}
+          {WEEKDAYS.map((label, d) => (
+            <div key={label} className="contents">
+              <span className="self-center text-[11px] font-semibold text-slate-500">{label}</span>
+              {Array.from({ length: 24 }, (_, h) => {
+                const count = grid.get(`${d}-${h}`) ?? 0;
+                return (
+                  <motion.span
+                    key={h}
+                    onPointerEnter={() => setHover({ day: d, hour: h, count })}
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: (d * 24 + h) * 0.002 }}
+                    className={`aspect-square rounded-[4px] ${hover?.day === d && hover?.hour === h ? "ring-2 ring-navy" : ""}`}
+                    style={{ background: RAMP[step(count)] }}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+        <p className="min-h-4">
+          {hover ? <><b className="text-navy">{WEEKDAYS[hover.day]} {String(hover.hour).padStart(2, "0")}:00</b> — {hover.count} answer{hover.count === 1 ? "" : "s"}</>
+            : busiest ? <>Busiest: <b className="text-navy">{WEEKDAYS[busiest.day]} around {String(busiest.hour).padStart(2, "0")}:00</b> (Addis Ababa time)</> : "No practice in the last 4 weeks yet"}
+        </p>
+        <span className="flex items-center gap-1.5">Less {RAMP.map((c) => <span key={c} className="h-3 w-3 rounded-[3px]" style={{ background: c }} />)} More</span>
+      </div>
+    </div>
+  );
+}
+
+/** Accuracy per subject: a meter per row with a 50% reference tick, labelled with % and answer count. */
+export function AccuracyBars({ rows }: { rows: { label: string; total: number; correct: number }[] }) {
+  if (!rows.length) return <p className="py-8 text-center text-sm text-slate-500">No answers recorded yet.</p>;
+  return (
+    <ul className="grid gap-3.5">
+      {rows.map((r, i) => {
+        const pct = r.total ? Math.round((r.correct / r.total) * 100) : 0;
+        return (
+          <li key={r.label} className="grid grid-cols-[8.5rem_1fr_5.5rem] items-center gap-3 text-sm" title={`${r.label}: ${r.correct} of ${r.total} correct`}>
+            <span className="truncate text-slate-600">{r.label}</span>
+            <span className="relative h-2.5 rounded bg-[#cde2fb]">
+              <motion.span className="absolute inset-y-0 left-0 rounded" style={{ background: SERIES.blue }} initial={{ width: 0 }} whileInView={{ width: `${pct}%` }} viewport={{ once: true }} transition={{ duration: 0.8, delay: i * 0.05 }} />
+              <span className="absolute -inset-y-1 left-1/2 w-px bg-slate-400/70" />
+            </span>
+            <span className="text-right tabular-nums"><b className="text-navy">{pct}%</b> <span className="text-xs text-slate-400">· {r.total}</span></span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, CheckCircle2, FileUp, LoaderCircle, MessageCircle, Plus, ShieldCheck, Users, X } from "lucide-react";
+import { BookOpen, Check, CheckCircle2, FileUp, ListChecks, LoaderCircle, MessageCircle, Plus, ShieldCheck, ToggleLeft, Trash2, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Brand from "@/app/components/Brand";
@@ -23,7 +23,7 @@ async function fetchSummary(): Promise<Loaded<Summary>> {
   return { data };
 }
 
-const initial = { subject: "Mathematics", grade: "Grade 12", unit: "Unit 1: Algebra", year: "2016 E.C.", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
+const initial = { type: "mcq" as "mcq" | "truefalse", subject: "Mathematics", grade: "Grade 12", unit: "Unit 1: Algebra", year: "2016 E.C.", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
 const SUBJECTS = ALL_SUBJECTS.map((s) => s.name);
 const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 
@@ -58,13 +58,22 @@ export default function TeacherDashboard() {
     setSaving(false);
     const data = await response?.json().catch(() => ({}));
     if (!response?.ok) return setError(data?.error || "Could not publish the question.");
-    setForm(initial);
-    setOpen(false);
-    setNotice("Question published to the student exam bank.");
+    const another = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("name") === "another";
+    // Keep subject/grade/unit/type when adding several questions in a row.
+    setForm({ ...initial, type: form.type, subject: form.subject, grade: form.grade, unit: form.unit, year: form.year, choices: form.type === "truefalse" ? ["True", "False"] : ["", "", "", ""] });
+    if (!another) setOpen(false);
+    setNotice(another ? "Question published — ready for the next one." : "Question published to the student exam bank.");
     window.setTimeout(() => setNotice(""), 5000);
     load();
   }
 
+  const setType = (type: "mcq" | "truefalse") =>
+    setForm({ ...form, type, choices: type === "truefalse" ? ["True", "False"] : ["", "", "", ""], correctAnswer: 0 });
+  const removeChoice = (i: number) => setForm({
+    ...form,
+    choices: form.choices.filter((_, index) => index !== i),
+    correctAnswer: form.correctAnswer === i ? 0 : form.correctAnswer > i ? form.correctAnswer - 1 : form.correctAnswer,
+  });
   const setChoice = (i: number, value: string) => setForm({ ...form, choices: form.choices.map((item, index) => (index === i ? value : item)) });
   const stats = [
     { value: summary?.myQuestions, label: `My questions (of ${summary?.questions ?? "–"} total)`, icon: BookOpen, color: "bg-blue-50 text-royal" },
@@ -166,22 +175,56 @@ export default function TeacherDashboard() {
                 <label className="text-sm font-bold">Unit<input required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
                 <label className="text-sm font-bold">Exam year<input required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
               </div>
-              <label className="mt-4 block text-sm font-bold">Question<textarea required value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {form.choices.map((choice, i) => (
-                  <label key={i} className="text-sm font-bold">
-                    <span className="flex items-center justify-between">Choice {String.fromCharCode(65 + i)}
-                      <button type="button" onClick={() => setForm({ ...form, correctAnswer: i })} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${form.correctAnswer === i ? "bg-green-100 text-green-700" : "text-slate-400 hover:bg-slate-100"}`}>{form.correctAnswer === i ? "✓ Correct" : "Mark correct"}</button>
-                    </span>
-                    <input required value={choice} onChange={(e) => setChoice(i, e.target.value)} className={`mt-2 w-full rounded-xl border p-3 font-normal ${form.correctAnswer === i ? "border-green-400 bg-green-50/50" : "border-slate-200"}`} />
-                  </label>
+              {/* Question type */}
+              <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5" role="radiogroup" aria-label="Question type">
+                {([["mcq", "Multiple choice", ListChecks], ["truefalse", "True / False", ToggleLeft]] as const).map(([value, label, Icon]) => (
+                  <button key={value} type="button" role="radio" aria-checked={form.type === value} onClick={() => setType(value)} className={`relative flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold ${form.type === value ? "text-navy" : "text-slate-500"}`}>
+                    {form.type === value && <motion.span layoutId="question-type" className="absolute inset-0 rounded-xl bg-white shadow-sm" />}
+                    <Icon size={16} className="relative" /><span className="relative">{label}</span>
+                  </button>
                 ))}
               </div>
+              <label className="mt-4 block text-sm font-bold">{form.type === "truefalse" ? "Statement" : "Question"}<textarea required value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} placeholder={form.type === "truefalse" ? "e.g. Lake Tana is the source of the Blue Nile." : "e.g. What is the value of x if 3x + 6 = 21?"} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+              {form.type === "truefalse" ? (
+                <div className="mt-4">
+                  <p className="text-sm font-bold">Correct answer</p>
+                  <div className="mt-2 grid grid-cols-2 gap-3">
+                    {["True", "False"].map((label, i) => (
+                      <motion.button key={label} type="button" whileTap={{ scale: 0.97 }} onClick={() => setForm({ ...form, correctAnswer: i })} className={`flex items-center justify-center gap-2 rounded-2xl border-2 py-4 text-lg font-extrabold transition ${form.correctAnswer === i ? (i === 0 ? "border-green-500 bg-green-50 text-green-700" : "border-red-400 bg-red-50 text-red-600") : "border-slate-200 text-slate-400 hover:border-slate-300"}`}>
+                        {i === 0 ? <Check size={20} /> : <X size={20} />}{label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4">
+                  <p className="flex items-center justify-between text-sm font-bold">Choices <span className="text-xs font-semibold text-slate-400">Click a letter to mark the correct answer</span></p>
+                  <div className="mt-2 grid gap-2.5">
+                    <AnimatePresence initial={false}>
+                      {form.choices.map((choice, i) => (
+                        <motion.div key={i} layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className={`flex items-center gap-2 rounded-xl border p-1.5 ${form.correctAnswer === i ? "border-green-400 bg-green-50/60" : "border-slate-200"}`}>
+                          <button type="button" onClick={() => setForm({ ...form, correctAnswer: i })} aria-label={`Mark choice ${String.fromCharCode(65 + i)} correct`} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-extrabold ${form.correctAnswer === i ? "bg-green-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                            {form.correctAnswer === i ? <Check size={16} /> : String.fromCharCode(65 + i)}
+                          </button>
+                          <input required value={choice} onChange={(e) => setChoice(i, e.target.value)} placeholder={`Choice ${String.fromCharCode(65 + i)}`} className="min-w-0 flex-1 bg-transparent px-1 py-1.5 outline-none" />
+                          {form.choices.length > 2 && <button type="button" onClick={() => removeChoice(i)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove choice"><Trash2 size={15} /></button>}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                  {form.choices.length < 6 && <button type="button" onClick={() => setForm({ ...form, choices: [...form.choices, ""] })} className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold text-royal hover:bg-blue-50"><Plus size={14} /> Add choice</button>}
+                </div>
+              )}
               <label className="mt-4 block text-sm font-bold">Explanation <span className="font-normal text-slate-400">(optional)</span><textarea value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
               {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
-              <button disabled={saving} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy px-4 py-3.5 font-bold text-white hover:bg-royal disabled:opacity-70">
-                {saving ? <><LoaderCircle size={18} className="animate-spin" /> Publishing...</> : "Publish question"}
-              </button>
+              <div className="mt-6 grid gap-2 sm:grid-cols-2">
+                <button type="submit" name="another" value="1" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3.5 font-bold hover:border-royal disabled:opacity-70">
+                  <Plus size={17} /> Publish &amp; add another
+                </button>
+                <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-4 py-3.5 font-bold text-white hover:bg-royal disabled:opacity-70">
+                  {saving ? <><LoaderCircle size={18} className="animate-spin" /> Publishing...</> : "Publish question"}
+                </button>
+              </div>
             </motion.form>
           </motion.div>
         )}

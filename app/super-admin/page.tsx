@@ -2,7 +2,7 @@
 import { AnimatePresence, animate, motion } from "framer-motion";
 import {
   AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, LayoutDashboard, LoaderCircle,
-  RefreshCw, Search, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
+  MessageCircle, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -11,7 +11,7 @@ import Brand from "@/app/components/Brand";
 import LogoutButton from "@/app/components/LogoutButton";
 import { useSession } from "@/app/components/useSession";
 import { SUBJECTS } from "@/lib/subjects";
-import { Meter, SERIES, STATUS, StackedBar, SubjectBars, TrendChart } from "./charts";
+import { AccuracyBars, DailyStacked, Heatmap, Meter, SERIES, STATUS, Sparkline, StackedBar, SubjectBars, TrendChart } from "./charts";
 
 type Status = "pending" | "active" | "restricted" | "banned" | "rejected";
 type Account = { id: string; name: string; email: string; role: string; plan: string; status: Status; subject: string | null; createdAt: string };
@@ -19,6 +19,14 @@ type Overview = {
   usersByRoleStatus: { role: string; status: string; count: number }[];
   signups: { date: string; count: number }[];
   attempts: { date: string; count: number }[];
+  messages: { date: string; count: number }[];
+  questionsPerDay: { date: string; count: number }[];
+  signupsByRole: { date: string; students: number; teachers: number }[];
+  heatmap: { day: number; hour: number; count: number }[];
+  subjectPerformance: { subject: string; total: number; correct: number }[];
+  topStudents: { name: string; total: number; correct: number }[];
+  approvals: { approved: number; rejected: number; avgHours: number | null };
+  chat: { conversations: number; messages: number };
   attemptTotal: number; attemptCorrect: number; questionCount: number;
   questionsBySubject: { subject: string; count: number }[];
   recentQuestions: { id: string; prompt: string; subject: string; teacher: string; createdAt: string }[];
@@ -78,19 +86,23 @@ function SuperAdmin() {
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   const apply = useCallback((result: Awaited<ReturnType<typeof fetchAll>>) => {
     setRefreshing(false);
     setError(result.users.error || result.overview.error || "");
     if (result.users.data) { setUsers(result.users.data.users); setMe(result.users.data.me); }
     if (result.overview.data) setOverview(result.overview.data);
+    setUpdatedAt(new Date());
   }, []);
   const reload = useCallback(() => { setRefreshing(true); return fetchAll().then(apply); }, [apply]);
 
   useEffect(() => {
     let active = true;
     fetchAll().then((result) => active && apply(result));
-    return () => { active = false; };
+    // Keep the dashboard live without a manual refresh.
+    const id = window.setInterval(() => fetchAll().then((result) => active && apply(result)), 60000);
+    return () => { active = false; window.clearInterval(id); };
   }, [apply]);
 
   useEffect(() => {
@@ -168,7 +180,7 @@ function SuperAdmin() {
 
           <AnimatePresence mode="wait">
             <motion.div key={section} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
-              {section === "overview" && <OverviewSection name={user?.name} users={users} overview={overview} pending={pending} busy={busy} onDecide={setStatus} goTo={setSection} />}
+              {section === "overview" && <OverviewSection name={user?.name} users={users} overview={overview} pending={pending} busy={busy} onDecide={setStatus} goTo={setSection} updatedAt={updatedAt} />}
               {section === "approvals" && <ApprovalsSection pending={pending} busy={busy} onDecide={setStatus} />}
               {section === "users" && <UsersSection users={users} me={me} busy={busy} onDecide={setStatus} onSubject={setSubject} />}
               {section === "staff" && <StaffSection onCreated={(text) => { setToast({ ok: true, text }); reload(); }} onError={(text) => setToast({ ok: false, text })} />}
@@ -202,23 +214,38 @@ function NavButton({ item, active, onClick }: { item: { label: string; icon: Luc
 
 /* ---------------- Overview ---------------- */
 
-function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo }: {
+type Metric = "signups" | "attempts" | "messages" | "questionsPerDay";
+const METRICS: { id: Metric; label: string; title: string }[] = [
+  { id: "signups", label: "Registrations", title: "New registrations" },
+  { id: "attempts", label: "Answers", title: "Practice answers" },
+  { id: "messages", label: "Messages", title: "Chat messages" },
+  { id: "questionsPerDay", label: "Questions", title: "Questions published" },
+];
+
+function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo, updatedAt }: {
   name?: string; users: Account[]; overview: Overview | null; pending: Account[]; busy: string[];
-  onDecide: (ids: string[], status: Status, verb: string) => void; goTo: (s: Section) => void;
+  onDecide: (ids: string[], status: Status, verb: string) => void; goTo: (s: Section) => void; updatedAt: Date | null;
 }) {
-  const [metric, setMetric] = useState<"signups" | "attempts">("signups");
+  const [metric, setMetric] = useState<Metric>("signups");
   const count = (fn: (u: Account) => boolean) => users.filter(fn).length;
   const accuracy = overview && overview.attemptTotal ? (overview.attemptCorrect / overview.attemptTotal) * 100 : 0;
   const subjectRows = SUBJECTS.map((s) => ({ label: s.name, value: overview?.questionsBySubject.find((q) => q.subject === s.name)?.count ?? 0 })).sort((a, b) => b.value - a.value);
+  const accuracyRows = (overview?.subjectPerformance ?? []).map((s) => ({ label: s.subject, total: s.total, correct: s.correct })).sort((a, b) => b.total - a.total);
   const series = overview ? overview[metric] : [];
   const seriesTotal = series.reduce((sum, d) => sum + d.count, 0);
+  const spark = (rows?: { count: number }[]) => (rows ?? []).map((r) => r.count);
+  const sum = (rows?: { count: number }[]) => (rows ?? []).reduce((s, r) => s + r.count, 0);
+  const approvals = overview?.approvals;
+  const decided = (approvals?.approved ?? 0) + (approvals?.rejected ?? 0);
+  const approvalRate = decided ? ((approvals?.approved ?? 0) / decided) * 100 : 0;
 
   const kpis = [
-    { label: "Total accounts", value: users.length, icon: Users, tint: "bg-blue-50 text-royal" },
-    { label: "Awaiting approval", value: pending.length, icon: Clock3, tint: "bg-amber-50 text-amber-600", highlight: pending.length > 0 },
-    { label: "Active students", value: count((u) => u.role === "student" && u.status === "active"), icon: GraduationCap, tint: "bg-sky-50 text-sky-600" },
-    { label: "Active teachers", value: count((u) => u.role === "admin" && u.status === "active"), icon: BookOpen, tint: "bg-orange-50 text-orange-600" },
-    { label: "Questions published", value: overview?.questionCount ?? 0, icon: Sparkles, tint: "bg-violet-50 text-violet-600" },
+    { label: "Total accounts", value: users.length, icon: Users, tint: "bg-blue-50 text-royal", spark: spark(overview?.signups), note: `+${sum(overview?.signups)} in 14 days` },
+    { label: "Awaiting approval", value: pending.length, icon: Clock3, tint: "bg-amber-50 text-amber-600", highlight: pending.length > 0, note: pending.length ? "Needs your review" : "All reviewed" },
+    { label: "Active students", value: count((u) => u.role === "student" && u.status === "active"), icon: GraduationCap, tint: "bg-sky-50 text-sky-600", spark: overview?.signupsByRole.map((d) => d.students), note: "New sign-ups trend" },
+    { label: "Active teachers", value: count((u) => u.role === "admin" && u.status === "active"), icon: BookOpen, tint: "bg-orange-50 text-orange-600", spark: overview?.signupsByRole.map((d) => d.teachers), color: SERIES.orange, note: "New sign-ups trend" },
+    { label: "Questions published", value: overview?.questionCount ?? 0, icon: Sparkles, tint: "bg-violet-50 text-violet-600", spark: spark(overview?.questionsPerDay), note: `+${sum(overview?.questionsPerDay)} in 14 days` },
+    { label: "Practice answers", value: overview?.attemptTotal ?? 0, icon: Target, tint: "bg-emerald-50 text-emerald-600", spark: spark(overview?.attempts), note: `+${sum(overview?.attempts)} in 14 days` },
   ];
 
   return (
@@ -227,30 +254,51 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo 
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-[#12306b] to-royal p-6 text-white sm:p-8">
         <div className="bg-grid absolute inset-0" />
         <Orbits />
-        <div className="relative max-w-xl">
-          <p className="text-xs font-bold uppercase tracking-[.18em] text-gold">Platform overview</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{greeting()}{name ? `, ${name}` : ""} 👋</h1>
-          <p className="mt-3 leading-7 text-white/75">
-            {pending.length
-              ? <>You have <span className="font-extrabold text-gold">{pending.length} {pending.length === 1 ? "registration" : "registrations"}</span> waiting for approval.</>
-              : "Every registration has been reviewed. Nice work!"}
-          </p>
-          {pending.length > 0 && (
-            <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => goTo("approvals")} className="btn-shine mt-5 inline-flex items-center gap-2 rounded-xl bg-gold px-5 py-3 text-sm font-bold text-navy shadow-lg shadow-gold/20">
-              <ClipboardCheck size={17} /> Review approvals
-            </motion.button>
-          )}
+        <div className="relative flex flex-wrap items-end justify-between gap-6">
+          <div className="max-w-xl">
+            <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[.18em] text-gold">
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" /></span>
+              Live overview{updatedAt && <span className="font-semibold normal-case tracking-normal text-white/60">· updated {updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+            </p>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{greeting()}{name ? `, ${name}` : ""} 👋</h1>
+            <p className="mt-3 leading-7 text-white/75">
+              {pending.length
+                ? <>You have <span className="font-extrabold text-gold">{pending.length} {pending.length === 1 ? "registration" : "registrations"}</span> waiting for approval.</>
+                : "Every registration has been reviewed. Nice work!"}
+            </p>
+            {pending.length > 0 && (
+              <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => goTo("approvals")} className="btn-shine mt-5 inline-flex items-center gap-2 rounded-xl bg-gold px-5 py-3 text-sm font-bold text-navy shadow-lg shadow-gold/20">
+                <ClipboardCheck size={17} /> Review approvals
+              </motion.button>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            {[
+              { label: "Accuracy", value: `${Math.round(accuracy)}%` },
+              { label: "Conversations", value: overview?.chat.conversations ?? 0 },
+              { label: "Messages", value: overview?.chat.messages ?? 0 },
+            ].map((s) => (
+              <div key={s.label} className="glass min-w-24 rounded-2xl px-4 py-3">
+                <p className="text-2xl font-extrabold tabular-nums">{s.value}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/60">{s.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+      {/* KPIs with 14-day sparklines */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-6">
         {kpis.map((kpi, i) => (
-          <motion.div key={kpi.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} className={`card-lift relative overflow-hidden rounded-2xl border bg-white p-5 ${kpi.highlight ? "border-gold/60" : "border-slate-200"}`}>
+          <motion.div key={kpi.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className={`card-lift relative overflow-hidden rounded-2xl border bg-white p-5 ${kpi.highlight ? "border-gold/60" : "border-slate-200"}`}>
             {kpi.highlight && <span className="absolute right-4 top-4 flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-gold" /></span>}
-            <span className={`grid h-10 w-10 place-items-center rounded-xl ${kpi.tint}`}><kpi.icon size={20} /></span>
+            <div className="flex items-start justify-between gap-2">
+              <span className={`grid h-10 w-10 place-items-center rounded-xl ${kpi.tint}`}><kpi.icon size={20} /></span>
+              {kpi.spark && kpi.spark.length > 0 && <Sparkline values={kpi.spark} color={kpi.color} />}
+            </div>
             <p className="mt-4 text-3xl font-extrabold tabular-nums"><Counter value={kpi.value} /></p>
-            <p className="text-sm text-slate-500">{kpi.label}</p>
+            <p className="text-sm font-semibold text-slate-600">{kpi.label}</p>
+            <p className="mt-0.5 text-xs text-slate-400">{kpi.note}</p>
           </motion.div>
         ))}
       </div>
@@ -258,20 +306,20 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo 
       {/* Trend + composition */}
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
         <Panel
-          title={metric === "signups" ? "New registrations" : "Practice attempts"}
+          title={METRICS.find((m) => m.id === metric)!.title}
           subtitle={`${seriesTotal} in the last 14 days`}
           action={
-            <div className="inline-grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-xs font-bold">
-              {(["signups", "attempts"] as const).map((m) => (
-                <button key={m} onClick={() => setMetric(m)} className={`relative rounded-lg px-3 py-1.5 ${metric === m ? "text-navy" : "text-slate-500"}`}>
-                  {metric === m && <motion.span layoutId="metric-pill" className="absolute inset-0 rounded-lg bg-white shadow-sm" />}
-                  <span className="relative">{m === "signups" ? "Registrations" : "Attempts"}</span>
+            <div className="inline-flex flex-wrap rounded-xl bg-slate-100 p-1 text-xs font-bold">
+              {METRICS.map((m) => (
+                <button key={m.id} onClick={() => setMetric(m.id)} className={`relative rounded-lg px-3 py-1.5 ${metric === m.id ? "text-navy" : "text-slate-500"}`}>
+                  {metric === m.id && <motion.span layoutId="metric-pill" className="absolute inset-0 rounded-lg bg-white shadow-sm" />}
+                  <span className="relative">{m.label}</span>
                 </button>
               ))}
             </div>
           }
         >
-          {overview ? <TrendChart key={metric} data={series} label={metric === "signups" ? "Registrations" : "Attempts"} /> : <Skeleton h="h-56" />}
+          {overview ? <TrendChart key={metric} data={series} label={METRICS.find((m) => m.id === metric)!.label} /> : <Skeleton h="h-56" />}
         </Panel>
 
         <Panel title="Who's on the platform" subtitle={`${users.length} accounts in total`}>
@@ -296,20 +344,85 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo 
         </Panel>
       </div>
 
-      {/* Content + learning */}
-      <div className="grid gap-6 xl:grid-cols-3">
-        <Panel title="Questions by subject" subtitle="Published question bank coverage" className="xl:col-span-2">
-          {overview ? <SubjectBars rows={subjectRows} /> : <Skeleton h="h-56" />}
+      {/* Registrations by role + approval pipeline */}
+      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+        <Panel title="Registrations by role" subtitle="Students and teachers who signed up each day">
+          {overview ? <DailyStacked data={overview.signupsByRole} keys={[{ key: "students", label: "Students", color: SERIES.blue }, { key: "teachers", label: "Teachers", color: SERIES.orange }]} /> : <Skeleton h="h-52" />}
         </Panel>
-        <Panel title="Practice accuracy" subtitle="Share of answers that were correct">
+        <Panel title="Approval pipeline" subtitle="How registrations are being decided">
+          <div className="flex items-end gap-2">
+            <span className="text-5xl font-extrabold tabular-nums"><Counter value={Math.round(approvalRate)} /></span>
+            <span className="mb-1.5 text-xl font-bold text-slate-400">%</span>
+            <span className="mb-2 ml-1 text-sm text-slate-500">approval rate</span>
+          </div>
+          <div className="mt-4"><Meter value={approvalRate} label="Approval rate" /></div>
+          <ul className="mt-5 grid grid-cols-3 gap-2 text-center">
+            {[
+              { label: "Waiting", value: pending.length, meta: STATUS_META.pending },
+              { label: "Approved", value: approvals?.approved ?? 0, meta: STATUS_META.active },
+              { label: "Rejected", value: approvals?.rejected ?? 0, meta: STATUS_META.rejected },
+            ].map((s) => (
+              <li key={s.label} className="rounded-2xl bg-slate-50 p-3">
+                <s.meta.icon size={16} className="mx-auto" style={{ color: s.meta.color }} />
+                <p className="mt-1 text-xl font-extrabold tabular-nums">{s.value}</p>
+                <p className="text-[11px] font-semibold text-slate-500">{s.label}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-sm text-slate-600">
+            <Clock3 size={15} className="text-royal" />
+            {approvals?.avgHours != null ? <>Average time to decide: <b className="text-navy">{formatHours(approvals.avgHours)}</b></> : "No decisions recorded yet"}
+          </p>
+        </Panel>
+      </div>
+
+      {/* Practice habits + top students */}
+      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+        <Panel title="When students practise" subtitle="Answers by weekday and hour · last 4 weeks">
+          {overview ? <Heatmap cells={overview.heatmap} /> : <Skeleton h="h-52" />}
+        </Panel>
+        <Panel title="Top students" subtitle="Most answers submitted">
+          {overview?.topStudents.length ? (
+            <ol className="grid gap-2.5">
+              {overview.topStudents.map((s, i) => {
+                const pct = s.total ? Math.round((s.correct / s.total) * 100) : 0;
+                return (
+                  <motion.li key={s.name + i} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-3">
+                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-extrabold ${i === 0 ? "bg-gold text-navy" : i === 1 ? "bg-slate-200 text-navy" : i === 2 ? "bg-orange-200 text-orange-900" : "bg-slate-100 text-slate-500"}`}>{i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-bold">{s.name}</span>
+                      <span className="text-xs text-slate-500">{s.total} answers · {pct}% correct</span>
+                    </span>
+                    <span className="h-1.5 w-16 overflow-hidden rounded bg-[#cde2fb]"><span className="block h-full rounded" style={{ width: `${pct}%`, background: SERIES.blue }} /></span>
+                  </motion.li>
+                );
+              })}
+            </ol>
+          ) : <p className="py-8 text-center text-sm text-slate-500">No practice recorded yet.</p>}
+        </Panel>
+      </div>
+
+      {/* Learning outcomes + content coverage */}
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Panel title="Accuracy by subject" subtitle="Share of correct answers · tick marks 50%">
+          {overview ? <AccuracyBars rows={accuracyRows} /> : <Skeleton h="h-52" />}
+        </Panel>
+        <Panel title="Questions by subject" subtitle="Published question bank coverage">
+          {overview ? <SubjectBars rows={subjectRows} /> : <Skeleton h="h-52" />}
+        </Panel>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Panel title="Practice accuracy" subtitle="All answers on the platform">
           <div className="flex items-end gap-2">
             <span className="text-5xl font-extrabold tabular-nums"><Counter value={Math.round(accuracy)} /></span>
             <span className="mb-1.5 text-xl font-bold text-slate-400">%</span>
           </div>
           <div className="mt-4"><Meter value={accuracy} label="Practice accuracy" /></div>
           <p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><Target size={15} className="text-royal" />{overview?.attemptCorrect ?? 0} correct of {overview?.attemptTotal ?? 0} answers</p>
-          <p className="mt-6 text-xs font-bold uppercase tracking-wider text-slate-400">Latest questions</p>
-          <ul className="mt-3 grid gap-3">
+        </Panel>
+        <Panel title="Latest questions" subtitle="Most recently published">
+          <ul className="grid gap-3">
             {overview?.recentQuestions.length ? overview.recentQuestions.slice(0, 3).map((q) => (
               <li key={q.id} className="rounded-xl border border-slate-100 p-3">
                 <p className="line-clamp-2 text-sm font-semibold">{q.prompt}</p>
@@ -317,6 +430,14 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo 
               </li>
             )) : <li className="text-sm text-slate-500">No questions yet.</li>}
           </ul>
+        </Panel>
+        <Panel title="Teacher support chat" subtitle="Student ↔ teacher conversations">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-blue-50 p-4"><MessageCircle size={18} className="text-royal" /><p className="mt-2 text-3xl font-extrabold tabular-nums"><Counter value={overview?.chat.conversations ?? 0} /></p><p className="text-xs font-semibold text-slate-500">Conversations</p></div>
+            <div className="rounded-2xl bg-amber-50 p-4"><Send size={18} className="text-amber-600" /><p className="mt-2 text-3xl font-extrabold tabular-nums"><Counter value={overview?.chat.messages ?? 0} /></p><p className="text-xs font-semibold text-slate-500">Messages</p></div>
+          </div>
+          <div className="mt-4">{overview && <Sparkline values={spark(overview.messages)} />}</div>
+          <p className="mt-1 text-xs text-slate-400">Messages per day · last 14 days</p>
         </Panel>
       </div>
 
@@ -337,6 +458,8 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo 
     </div>
   );
 }
+
+const formatHours = (h: number) => (h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 48 ? `${h.toFixed(1)} h` : `${(h / 24).toFixed(1)} days`);
 
 function TeachersBySubject({ users }: { users: Account[] }) {
   const teachers = users.filter((u) => u.role === "admin");

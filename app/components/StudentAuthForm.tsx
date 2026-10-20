@@ -66,12 +66,12 @@ export default function StudentAuthForm({ mode }: { mode: "login" | "signup" }) 
           <PendingApproval key="done" role={submitted} email={form.email} />
         ) : (
           <motion.div key="form" exit={{ opacity: 0, y: -10 }}>
-            <h2 className="text-3xl font-extrabold tracking-tight">{signup ? "Create your account" : "Sign in"}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
+            <h2 className="text-center text-3xl font-extrabold tracking-tight">{signup ? "Create your account" : "Welcome back"}</h2>
+            <p className="mt-2 text-center text-sm leading-6 text-slate-500">
               {signup ? "Register as a student or a teacher. A platform administrator approves every new account." : "Students, teachers and administrators can all sign in here."}
             </p>
 
-            <form onSubmit={submit} className="mt-8 grid gap-4">
+            <form onSubmit={submit} className="mt-7 grid gap-4">
               {signup && (
                 <div>
                   <p className="text-sm font-semibold">I am a</p>

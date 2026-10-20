@@ -28,6 +28,8 @@ export type DbQuestion = {
   grade: string;
   unit: string;
   year: string;
+  /** "mcq" (default for older questions) or "truefalse" (choices are always ["True", "False"]). */
+  type?: "mcq" | "truefalse";
   prompt: string;
   choices: string[];
   correctAnswer: number;

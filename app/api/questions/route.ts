@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     if (unit && unit !== "All topics") filter.unit = unit;
     if (year) filter.year = year;
     const questions = await (await getDb()).collection<DbQuestion>("questions").find(filter).sort({ createdAt: 1 }).limit(100).toArray();
-    return Response.json({ questions: questions.map((q) => ({ id: q._id?.toString(), subject: q.subject, grade: q.grade, unit: q.unit, year: q.year, question: q.prompt, choices: q.choices, answer: q.correctAnswer, explanation: q.explanation, teacher: q.teacherName })) });
+    return Response.json({ questions: questions.map((q) => ({ id: q._id?.toString(), subject: q.subject, grade: q.grade, unit: q.unit, year: q.year, type: q.type ?? "mcq", question: q.prompt, choices: q.choices, answer: q.correctAnswer, explanation: q.explanation, teacher: q.teacherName })) });
   } catch (error) { return apiError(error); }
 }
 
@@ -26,19 +26,20 @@ type Defaults = { subject: string; grade: string; unit: string; year: string };
 
 /** Validates one incoming question; returns an error message or the document to insert. */
 function toQuestion(input: Record<string, unknown>, defaults: Defaults, teacher: { id: string; name: string }): Omit<DbQuestion, "_id"> | string {
-  const choices = Array.isArray(input.choices) ? input.choices.map((item: unknown) => cleanString(item, 250)) : [];
+  const type = input.type === "truefalse" ? "truefalse" : "mcq";
+  const choices = type === "truefalse" ? ["True", "False"] : Array.isArray(input.choices) ? input.choices.map((item: unknown) => cleanString(item, 250)) : [];
   const correctAnswer = Number(input.correctAnswer);
   const now = new Date();
   const question: Omit<DbQuestion, "_id"> = {
     subject: cleanString(input.subject, 60) || defaults.subject, grade: cleanString(input.grade, 30) || defaults.grade,
     unit: cleanString(input.unit, 60) || defaults.unit, year: cleanString(input.year, 30) || defaults.year || "2016 E.C.",
-    prompt: cleanString(input.question ?? input.prompt, 1000), choices, correctAnswer, explanation: cleanString(input.explanation, 1500),
+    type, prompt: cleanString(input.question ?? input.prompt, 1000), choices, correctAnswer, explanation: cleanString(input.explanation, 1500),
     teacherName: teacher.name, createdBy: new ObjectId(teacher.id), published: input.published !== false, createdAt: now, updatedAt: now,
   };
   if (!question.subject || !question.grade) return "Choose a subject and grade";
   if (!question.prompt) return "Question text is missing";
   if (choices.length < 2 || choices.length > 8 || choices.some((c) => !c)) return "Each question needs 2–8 non-empty choices";
-  if (!Number.isInteger(correctAnswer) || correctAnswer < 0 || correctAnswer >= choices.length) return "Select the correct answer";
+  if (!Number.isInteger(correctAnswer) || correctAnswer < 0 || correctAnswer >= choices.length) return type === "truefalse" ? "Choose True or False" : "Select the correct answer";
   return question;
 }
 

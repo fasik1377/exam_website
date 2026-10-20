@@ -50,10 +50,10 @@ export default function RoleLogin({ role, eyebrow, title, description, permissio
 
   return (
     <AuthShell eyebrow={eyebrow} title={title} description={description} points={permissions.slice(0, 4)}>
-      <span className="inline-flex items-center gap-2 rounded-full bg-royal/10 px-3 py-1 text-xs font-bold text-royal"><ShieldCheck size={14} /> Secure staff access</span>
-      <h2 className="mt-4 text-3xl font-extrabold tracking-tight">{role === "Admin" ? "Teacher" : "Platform admin"} login</h2>
-      <p className="mt-2 text-sm text-slate-500">Use the credentials provided by your platform administrator.</p>
-      <form onSubmit={submit} className="mt-8 grid gap-4">
+      <div className="text-center"><span className="inline-flex items-center gap-2 rounded-full bg-royal/10 px-3 py-1 text-xs font-bold text-royal"><ShieldCheck size={14} /> Secure staff access</span></div>
+      <h2 className="mt-4 text-center text-3xl font-extrabold tracking-tight">{role === "Admin" ? "Teacher" : "Platform admin"} login</h2>
+      <p className="mt-2 text-center text-sm text-slate-500">Use the credentials provided by your platform administrator.</p>
+      <form onSubmit={submit} className="mt-7 grid gap-4">
         <Field label="Email" icon={<Mail size={17} />} required type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
         <Field label="Password" icon={<KeyRound size={17} />} required type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
         <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 accent-royal" /> Remember me for 14 days</label>

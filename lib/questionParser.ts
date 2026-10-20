@@ -1,16 +1,27 @@
 /**
- * Turns the plain text of an uploaded exam document into structured multiple-choice questions.
+ * Turns the plain text of an uploaded exam document into structured questions —
+ * multiple choice and true/false.
  *
- * Understands the layouts teachers commonly use:
+ * Multiple choice:
  *   1. Question text            Q1) / Question 1: / 1- also work
  *   A. choice  B) choice  (c) choice    — one per line or several on one line
  *   Answer: B                  Ans: b / Correct answer - B / a "*" on the right choice
  *   Explanation: why ...       optional, may span several lines
- * plus an "Answer key" section at the end (1. B  2-C  3) A ...).
+ *
+ * True / false (any of these):
+ *   a "True or False" / "Part I: True/False" heading before the questions
+ *   1. The Nile is the longest river. (True/False)
+ *   1. True or False: Water boils at 100 °C at sea level.
+ *   Answer: True  /  Answer: F  /  choices "A. True  B. False"
+ *
+ * Plus an "Answer key" section at the end: "1. B  2-C  3) True  4. F".
  */
+
+export type QuestionType = "mcq" | "truefalse";
 
 export type ParsedQuestion = {
   number: number | null;
+  type: QuestionType;
   prompt: string;
   choices: string[];
   correctAnswer: number; // -1 when unknown
@@ -18,15 +29,36 @@ export type ParsedQuestion = {
   issues: string[];
 };
 
+export const TRUE_FALSE = ["True", "False"];
+
 const QUESTION = /^(?:q(?:uestion)?\s*\.?\s*)?(\d{1,3})\s*[.)\-:–]\s*(.+)$/i;
 const CHOICE = /^\(?([a-h])\s*[.)\]:–-]\s*(.*)$/i;
-const ANSWER = /^(?:the\s+)?(?:correct\s+)?(?:answer|ans|key)\s*(?:is)?\s*[:.\-–=]?\s*\(?([a-h])\)?(?:[\s.).:,-]|$)/i;
+const ANSWER = /^(?:the\s+)?(?:correct\s+)?(?:answer|ans|key)\s*(?:is)?\s*[:.\-–=]?\s*\(?(true|false|[a-h]|t)\)?(?:[\s.).:,-]|$)/i;
 const EXPLANATION = /^(?:explanation|explain|reason|solution|rationale)\s*[:.\-–]\s*(.*)$/i;
 const KEY_HEADER = /^(?:answer\s*key|answers?|key)\s*[:.\-–]?\s*$/i;
-const KEY_PAIR = /(\d{1,3})\s*[.)\-:=–]?\s*\(?([a-h])\)?(?![a-z])/gi;
+const KEY_PAIR = /(\d{1,3})\s*[.)\-:=–]?\s*\(?(true|false|[a-h])\)?(?![a-z])/gi;
+const KEY_ONLY = /^\(?(true|false|[a-ht])\)?\.?$/i; // "12. B" / "12. True" / "12. T" on its own line
 const MARK = /^\*+\s*|\s*\*+$|\s*\((?:correct|answer)\)\s*$|\s*✓\s*$/i;
+const TF_HEADER = /\btrue\s*(?:or|\/|-|and)\s*false\b/i;
+const MCQ_HEADER = /\b(?:multiple\s*choice|choose\s+the\s+(?:correct|best)|select\s+the\s+(?:correct|best))\b/i;
+const SECTION = /^(?:part|section)\s+(?:[ivx]+|\d+|[a-d])\b/i;
+const TF_TAG = /\s*[([]\s*(?:true\s*(?:or|\/)\s*false|t\s*\/\s*f)\s*[)\]]\s*$/i;
+const TF_PREFIX = /^(?:true\s*(?:or|\/)\s*false|t\s*\/\s*f)\s*[:.\-–]\s*/i;
 
 const letterIndex = (letter: string) => letter.toUpperCase().charCodeAt(0) - 65;
+const isTrueFalseChoices = (choices: string[]) => choices.length === 2 && /^true\.?$/i.test(choices[0].trim()) && /^false\.?$/i.test(choices[1].trim());
+
+/** Resolves an answer token ("B", "true", "F") for a question of the given type. */
+function answerFor(token: string, type: QuestionType) {
+  const t = token.toLowerCase();
+  if (type === "truefalse") {
+    if (t === "true" || t === "t" || t === "a") return 0;
+    if (t === "false" || t === "f" || t === "b") return 1;
+    return -1;
+  }
+  if (t === "true" || t === "false") return -1;
+  return letterIndex(t);
+}
 
 /** Splits "A. 2  B. 4  C. 6  D. 8" into separate choice lines. */
 function splitInlineChoices(line: string): string[] {
@@ -45,54 +77,67 @@ function restoreLines(text: string) {
     .replace(/\s+(?=(?:answer|ans|explanation)\s*[:.-])/gi, "\n");
 }
 
+type Draft = ParsedQuestion & { tfHint: boolean; answerToken: string | null };
+
 export function parseQuestions(raw: string): { questions: ParsedQuestion[]; warnings: string[] } {
   const warnings: string[] = [];
   const text = restoreLines(raw.replace(/\r\n?/g, "\n").replace(/[ \t]/g, " ").replace(/[•▪●]/g, ""));
   const lines = text.split("\n").map((l) => l.trim()).flatMap(splitInlineChoices).map((l) => l.trim()).filter(Boolean);
 
-  const questions: ParsedQuestion[] = [];
-  let current: ParsedQuestion | null = null;
+  const drafts: Draft[] = [];
+  let current: Draft | null = null;
   let mode: "prompt" | "choices" | "explanation" | "key" = "prompt";
-  const answerKey = new Map<number, number>();
+  let tfSection = false;
+  const answerKey = new Map<number, string>();
 
+  const start = (number: number | null, prompt: string): Draft => {
+    let tfHint = tfSection;
+    if (TF_TAG.test(prompt) || TF_PREFIX.test(prompt)) { tfHint = true; prompt = prompt.replace(TF_TAG, "").replace(TF_PREFIX, ""); }
+    return { number, type: "mcq", prompt: prompt.trim(), choices: [], correctAnswer: -1, explanation: "", issues: [], tfHint, answerToken: null };
+  };
   const finish = () => {
-    if (current && (current.prompt || current.choices.length)) questions.push(current);
+    if (current && (current.prompt || current.choices.length)) drafts.push(current);
     current = null;
   };
 
   for (const line of lines) {
     if (KEY_HEADER.test(line)) { finish(); mode = "key"; continue; }
     if (mode === "key") {
-      // Inside an answer key everything is "number → letter".
       let matched = false;
-      for (const m of line.matchAll(KEY_PAIR)) { answerKey.set(Number(m[1]), letterIndex(m[2])); matched = true; }
+      for (const m of line.matchAll(KEY_PAIR)) { answerKey.set(Number(m[1]), m[2]); matched = true; }
       if (matched) continue;
       mode = "prompt";
     }
 
     const answer = line.match(ANSWER);
-    if (answer && current) { current.correctAnswer = letterIndex(answer[1]); mode = "choices"; continue; }
+    if (answer && current) { current.answerToken = answer[1]; mode = "choices"; continue; }
 
     const explanation = line.match(EXPLANATION);
     if (explanation && current) { current.explanation = explanation[1].trim(); mode = "explanation"; continue; }
 
     const question = line.match(QUESTION);
-    // "12. B" on its own is an answer-key entry, not a new question.
-    if (question && /^\(?[a-h]\)?\.?$/i.test(question[2].trim())) {
-      answerKey.set(Number(question[1]), letterIndex(question[2].replace(/[^a-h]/gi, "")));
+    if (question && KEY_ONLY.test(question[2].trim())) {
+      answerKey.set(Number(question[1]), question[2].replace(/[^a-z]/gi, ""));
       continue;
     }
     if (question) {
       finish();
-      current = { number: Number(question[1]), prompt: question[2].trim(), choices: [], correctAnswer: -1, explanation: "", issues: [] };
+      current = start(Number(question[1]), question[2]);
       mode = "prompt";
+      continue;
+    }
+
+    // Section headings switch the default question type for what follows.
+    if (!CHOICE.test(line) && line.length < 120 && (TF_HEADER.test(line) || MCQ_HEADER.test(line)) && (SECTION.test(line) || !current || current.choices.length || mode !== "prompt")) {
+      finish();
+      tfSection = TF_HEADER.test(line) && !MCQ_HEADER.test(line);
       continue;
     }
 
     const choice = line.match(CHOICE);
     if (choice && current && (mode === "prompt" || mode === "choices") && letterIndex(choice[1]) === current.choices.length) {
       let value = choice[2].trim();
-      if (MARK.test(value) || /^\*/.test(line)) { current.correctAnswer = current.choices.length; value = value.replace(MARK, "").trim(); }
+      if (MARK.test(value)) { current.answerToken = choice[1]; value = value.replace(MARK, "").trim(); }
       current.choices.push(value);
       mode = "choices";
       continue;
@@ -100,49 +145,64 @@ export function parseQuestions(raw: string): { questions: ParsedQuestion[]; warn
     // "*B. text" — answer marked with a leading star.
     const starred = line.replace(/^\*+\s*/, "").match(CHOICE);
     if (line.startsWith("*") && starred && current && letterIndex(starred[1]) === current.choices.length) {
-      current.correctAnswer = current.choices.length;
+      current.answerToken = starred[1];
       current.choices.push(starred[2].trim());
       mode = "choices";
       continue;
     }
 
     if (!current) {
-      // A question without a number: start one if the next lines turn out to be choices.
-      current = { number: null, prompt: line, choices: [], correctAnswer: -1, explanation: "", issues: [] };
+      current = start(null, line);
       mode = "prompt";
       continue;
     }
-    // Continuation of whatever we are reading.
     if (mode === "explanation") current.explanation = `${current.explanation} ${line}`.trim();
     else if (mode === "choices" && current.choices.length) current.choices[current.choices.length - 1] += ` ${line}`;
     else current.prompt = `${current.prompt} ${line}`.trim();
   }
   finish();
 
-  // Drop leading text (titles, instructions) that never got choices.
-  const kept = questions.filter((q) => q.choices.length > 0);
-  const dropped = questions.length - kept.length;
-  if (dropped) warnings.push(`${dropped} block${dropped === 1 ? "" : "s"} of text without answer choices (titles or instructions) were skipped.`);
-
-  for (const q of kept) {
-    if (q.correctAnswer < 0 && q.number !== null && answerKey.has(q.number)) q.correctAnswer = answerKey.get(q.number)!;
-    validate(q);
+  const questions: ParsedQuestion[] = [];
+  let skipped = 0;
+  for (const d of drafts) {
+    const token = d.answerToken ?? (d.number !== null ? answerKey.get(d.number) ?? null : null);
+    const tfAnswer = token !== null && /^(true|false|t|f)$/i.test(token);
+    const isTrueFalse = isTrueFalseChoices(d.choices) || (!d.choices.length && (d.tfHint || tfAnswer));
+    if (!isTrueFalse && !d.choices.length) { skipped++; continue; }
+    const type: QuestionType = isTrueFalse ? "truefalse" : "mcq";
+    const q: ParsedQuestion = {
+      number: d.number, type, prompt: d.prompt, choices: type === "truefalse" ? [...TRUE_FALSE] : d.choices,
+      correctAnswer: token !== null ? answerFor(token, type) : -1, explanation: d.explanation, issues: [],
+    };
+    questions.push(validate(q));
   }
-  if (!kept.length) warnings.push("No questions were recognised. Check that questions are numbered and choices start with A., B., C., D.");
-  return { questions: kept, warnings };
+  if (skipped) warnings.push(`${skipped} block${skipped === 1 ? "" : "s"} of text without answer choices (titles or instructions) were skipped.`);
+  if (!questions.length) warnings.push("No questions were recognised. Number your questions, start choices with A., B., C., D., and mark true/false questions with a “True or False” heading or (True/False).");
+  return { questions, warnings };
 }
 
 /** Recomputes the problems that block publishing a question. */
 export function validate(q: ParsedQuestion) {
   q.issues = [];
   if (q.prompt.trim().length < 3) q.issues.push("Question text is missing");
-  if (q.choices.filter((c) => c.trim()).length < 2) q.issues.push("Needs at least two choices");
-  if (q.choices.some((c) => !c.trim())) q.issues.push("A choice is empty");
-  if (q.correctAnswer < 0 || q.correctAnswer >= q.choices.length) q.issues.push("Correct answer not found — select it");
+  if (q.type === "mcq") {
+    if (q.choices.filter((c) => c.trim()).length < 2) q.issues.push("Needs at least two choices");
+    if (q.choices.some((c) => !c.trim())) q.issues.push("A choice is empty");
+  }
+  if (q.correctAnswer < 0 || q.correctAnswer >= q.choices.length) q.issues.push(q.type === "truefalse" ? "Choose True or False" : "Correct answer not found — select it");
   return q;
 }
 
+/** Switches a parsed question between the two formats, keeping what still makes sense. */
+export function convertType(q: ParsedQuestion, type: QuestionType): ParsedQuestion {
+  if (q.type === type) return q;
+  if (type === "truefalse") return validate({ ...q, type, choices: [...TRUE_FALSE], correctAnswer: q.correctAnswer > 1 ? -1 : q.correctAnswer });
+  return validate({ ...q, type, choices: isTrueFalseChoices(q.choices) ? ["", "", "", ""] : q.choices, correctAnswer: -1 });
+}
+
 export const TEMPLATE = `Grade 12 Mathematics — Unit 1 practice questions
+
+Part I: Choose the correct answer
 
 1. What is the value of x if 3x + 6 = 21?
 A. x = 3
@@ -162,12 +222,17 @@ A. 21
 C. 25
 D. 27
 
-4. If 2(x + 4) = 18, what is x?
-A) 3
-B) 5
-C) 7
-D) 9
+Part II: True or False
+
+4. Every square is a rectangle.
+Answer: True
+Explanation: A square has four right angles, so it is a special rectangle.
+
+5. The sum of the angles in a triangle is 360°.
+Answer: False
+
+6. Zero is an even number. (True/False)
 
 Answer key
-4. B
+6. True
 `;
