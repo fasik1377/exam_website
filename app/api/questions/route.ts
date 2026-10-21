@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { apiError, cleanString, readJson } from "@/lib/api";
-import { ensureDatabase, requireUser } from "@/lib/auth";
+import { ensureDatabase, getCurrentUser, requireUser } from "@/lib/auth";
+import { getSettings, hasFullAccess } from "@/lib/settings";
 import { getDb } from "@/lib/db";
 import type { DbQuestion } from "@/lib/types";
 import { findSubject } from "@/lib/subjectStore";
@@ -18,8 +19,18 @@ export async function GET(request: Request) {
     if (subject) filter.subject = subject;
     if (unit && unit !== "All topics") filter.unit = unit;
     if (year) filter.year = year;
-    const questions = await (await getDb()).collection<DbQuestion>("questions").find(filter).sort({ createdAt: 1 }).limit(100).toArray();
-    return Response.json({ questions: questions.map((q) => ({ id: q._id?.toString(), subject: q.subject, grade: q.grade, unit: q.unit, year: q.year, type: q.type ?? "mcq", question: q.prompt, choices: q.choices, answer: q.correctAnswer, explanation: q.explanation, teacher: q.teacherName })) });
+    const [all, user, settings] = await Promise.all([
+      (await getDb()).collection<DbQuestion>("questions").find(filter).sort({ createdAt: 1 }).limit(100).toArray(),
+      getCurrentUser(),
+      getSettings(),
+    ]);
+    // With payment on, free students and visitors get only the free questions and no explanations.
+    const full = hasFullAccess(user, settings);
+    const questions = full ? all : all.slice(0, settings.freeQuestions);
+    return Response.json({
+      limited: !full, total: all.length, freeQuestions: settings.freeQuestions, paymentRequired: settings.paymentRequired,
+      questions: questions.map((q) => ({ id: q._id?.toString(), subject: q.subject, grade: q.grade, unit: q.unit, year: q.year, type: q.type ?? "mcq", question: q.prompt, choices: q.choices, answer: q.correctAnswer, explanation: full ? q.explanation : "", teacher: q.teacherName })),
+    });
   } catch (error) { return apiError(error); }
 }
 

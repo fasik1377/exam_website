@@ -16,7 +16,8 @@ type SessionUser = { name: string; role: string; plan: "free" | "monthly" | "yea
 /** One answered (or timed-out) question in this sitting. */
 type Result = { choice: number; correct: boolean; timedOut: boolean; xp: number; combo: number };
 
-const FREE_LIMIT = 10;
+/** What the server allows this viewer: with payment on, free students get only the first questions. */
+type Access = { limited: boolean; total: number; freeQuestions: number };
 
 export default function ExamPage() { return <Suspense fallback={<Loading />}><Exam /></Suspense>; }
 function Loading() { return <main className="grid min-h-screen place-items-center bg-[#f7f9fc] text-sm font-bold text-slate-500">Loading questions...</main>; }
@@ -29,6 +30,7 @@ function Exam() {
   const subject = params.get("subject") || "Mathematics";
   const duration = secondsPerQuestion(subject, useSubjects());
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [access, setAccess] = useState<Access>({ limited: false, total: 0, freeQuestions: 0 });
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -40,8 +42,9 @@ function Exam() {
   const [showSubscribe, setShowSubscribe] = useState(false);
   const question = questions[index];
   const result = results[index];
-  const requiresSubscription = !user || user.plan === "free";
-  const locked = Boolean(question) && requiresSubscription && index >= FREE_LIMIT;
+  const requiresSubscription = access.limited;
+  const total = Math.max(access.total, questions.length);
+  const locked = access.limited && index >= questions.length && total > questions.length;
   const saves = user?.role === "student";
   const timeLeft = startedAt ? Math.max(0, duration - Math.floor((now - startedAt) / 1000)) : duration;
   const combo = (() => { let run = 0; for (let i = index - (result ? 0 : 1); i >= 0 && results[i]?.correct; i--) run++; return run; })();
@@ -50,7 +53,7 @@ function Exam() {
     fetch("/api/auth/me").then((r) => r.json()).then((data) => setUser(data.user)).catch(() => {});
     const query = new URLSearchParams({ grade, subject });
     fetch(`/api/questions?${query}`)
-      .then(async (r) => { const data = await r.json(); if (!r.ok) throw new Error(data.error); setQuestions(data.questions); const t = Date.now(); setStartedAt(t); setNow(t); })
+      .then(async (r) => { const data = await r.json(); if (!r.ok) throw new Error(data.error); setQuestions(data.questions); setAccess({ limited: Boolean(data.limited), total: data.total ?? data.questions.length, freeQuestions: data.freeQuestions ?? 0 }); const t = Date.now(); setStartedAt(t); setNow(t); })
       .catch((e) => setError(e.message || "Unable to load questions"))
       .finally(() => setLoading(false));
   }, [grade, subject]);
@@ -88,6 +91,7 @@ function Exam() {
   }
   function next() {
     if (index < questions.length - 1) go(index + 1);
+    else if (access.limited && total > questions.length) setIndex(questions.length);
     else setFinished(true);
   }
   function restart() {
@@ -111,7 +115,7 @@ function Exam() {
 
   if (loading) return <Loading />;
   if (error) return <Message title="Questions could not be loaded" detail={error} />;
-  if (!question) return <Message title="No questions published yet" detail={`A teacher can add ${grade} ${subject} questions from the teacher dashboard.`} />;
+  if (!question && !locked) return <Message title="No questions published yet" detail={`A teacher can add ${grade} ${subject} questions from the teacher dashboard.`} />;
 
   const answered = Object.keys(results).length;
   const sessionXp = Object.values(results).reduce((sum, r) => sum + r.xp, 0);
@@ -135,7 +139,7 @@ function Exam() {
           <div>
             <p className="text-xs font-bold uppercase tracking-[.16em] text-royal">{grade} · {subject}</p>
             <h1 className="mt-2 text-2xl font-bold">Practice exam</h1>
-            <p className="mt-1 text-sm text-slate-500">Question <b className="text-navy">{index + 1}</b> of {questions.length} · {duration >= 60 ? `${duration / 60} min` : `${duration} s`} per question</p>
+            <p className="mt-1 text-sm text-slate-500">Question <b className="text-navy">{Math.min(index + 1, total)}</b> of {total} · {duration >= 60 ? `${duration / 60} min` : `${duration} s`} per question</p>
             {combo >= 2 && <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-extrabold text-orange-600"><Flame size={13} />{combo} in a row!</p>}
           </div>
           {!locked && <TimerRing left={result ? (result.timedOut ? 0 : timeLeft) : timeLeft} total={duration} paused={Boolean(result)} />}
@@ -148,9 +152,14 @@ function Exam() {
             const tone = r ? (r.correct ? "bg-green-500 text-white" : r.timedOut ? "bg-amber-400 text-navy" : "bg-red-500 text-white") : "bg-slate-100 text-slate-500";
             return <button key={q.id} onClick={() => (r || i === index) && go(i)} disabled={!r && i !== index} aria-label={`Question ${i + 1}`} className={`h-7 min-w-7 rounded-lg px-1.5 text-xs font-bold transition ${tone} ${i === index ? "ring-2 ring-navy ring-offset-2" : ""} disabled:cursor-default`}>{i + 1}</button>;
           })}
+          {access.limited && total > questions.length && (
+            <button onClick={() => setIndex(questions.length)} disabled={!results[questions.length - 1] && questions.length > 0} title={`${total - questions.length} more questions with a subscription`} className={`inline-flex h-7 items-center gap-1 rounded-lg bg-gold/20 px-2 text-xs font-bold text-amber-800 ${locked ? "ring-2 ring-navy ring-offset-2" : ""}`}>
+              <Lock size={12} />+{total - questions.length}
+            </button>
+          )}
         </div>
 
-        {locked ? <div className="mt-10 rounded-2xl border border-slate-200 bg-[#f7f9fc] p-8 text-center"><Lock className="mx-auto" /><h2 className="mt-4 text-xl font-bold">Free preview complete</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">Subscribe to unlock the complete question bank and teacher support.</p><div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row"><button onClick={() => setShowSubscribe(true)} className="rounded-lg bg-navy px-4 py-3 text-sm font-bold text-white">Subscribe monthly or yearly</button>{answered > 0 && <button onClick={() => setFinished(true)} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">See my results</button>}{!user && <Link href="/signup" className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">Create student account</Link>}</div></div> : <>
+        {locked ? <div className="mt-10 rounded-2xl border border-slate-200 bg-[#f7f9fc] p-8 text-center"><Lock className="mx-auto" /><h2 className="mt-4 text-xl font-bold">{access.freeQuestions ? "Free preview complete" : "Subscription required"}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{access.freeQuestions ? `You've used the ${access.freeQuestions} free questions in ${subject}. ` : ""}Subscribe to unlock all {total} questions, every explanation and teacher support.</p><div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row"><button onClick={() => setShowSubscribe(true)} className="rounded-lg bg-navy px-4 py-3 text-sm font-bold text-white">Subscribe monthly or yearly</button>{answered > 0 && <button onClick={() => setFinished(true)} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">See my results</button>}{!user && <Link href="/signup" className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">Create student account</Link>}</div></div> : <>
           <AnimatePresence mode="wait"><motion.div key={question.id} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
             {question.type === "truefalse" && <p className="mt-8 inline-flex rounded-full bg-gold/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-800">True or false?</p>}
             <p className={`${question.type === "truefalse" ? "mt-3" : "mt-8"} whitespace-pre-line text-xl font-bold leading-8`}>{question.question}</p>
@@ -178,7 +187,7 @@ function Exam() {
 
           <div className="mt-7 flex items-center justify-between gap-3">
             <p className="hidden text-xs text-slate-400 sm:block">Tip: press <kbd className="rounded border px-1">A</kbd>–<kbd className="rounded border px-1">D</kbd> to answer, <kbd className="rounded border px-1">Enter</kbd> for next</p>
-            <button disabled={!result} onClick={next} className="ml-auto inline-flex items-center gap-2 rounded-xl bg-navy px-5 py-3 text-sm font-bold text-white hover:bg-royal disabled:opacity-40">{index === questions.length - 1 ? <>Finish &amp; see results <Trophy size={16} /></> : <>Next question <ChevronRight size={17} /></>}</button>
+            <button disabled={!result} onClick={next} className="ml-auto inline-flex items-center gap-2 rounded-xl bg-navy px-5 py-3 text-sm font-bold text-white hover:bg-royal disabled:opacity-40">{index === total - 1 ? <>Finish &amp; see results <Trophy size={16} /></> : <>Next question <ChevronRight size={17} /></>}</button>
           </div>
         </>}
 

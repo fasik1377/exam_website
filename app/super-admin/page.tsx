@@ -2,7 +2,7 @@
 import { AnimatePresence, animate, motion } from "framer-motion";
 import {
   AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, LayoutDashboard, LoaderCircle,
-  KeyRound, Library, Mail, MessageCircle, Trash2, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
+  CreditCard, KeyRound, Library, Mail, MessageCircle, Trash2, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -12,6 +12,7 @@ import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
 import { streamLabel } from "@/lib/subjects";
 import { useSubjects } from "@/app/components/useSubjects";
+import PaymentsSection from "./PaymentsSection";
 import SubjectsSection from "./SubjectsSection";
 import { AccuracyBars, DailyStacked, Heatmap, Meter, SERIES, STATUS, Sparkline, StackedBar, SubjectBars, TrendChart } from "./charts";
 
@@ -33,7 +34,7 @@ type Overview = {
   questionsBySubject: { subject: string; count: number }[];
   recentQuestions: { id: string; prompt: string; subject: string; teacher: string; createdAt: string }[];
 };
-type Section = "overview" | "approvals" | "users" | "subjects" | "staff";
+type Section = "overview" | "approvals" | "users" | "subjects" | "payments" | "staff";
 
 const ROLE_LABEL: Record<string, string> = { student: "Student", admin: "Teacher", "super-admin": "Platform admin" };
 const STATUS_META: Record<Status, { label: string; color: string; icon: LucideIcon; pill: string }> = {
@@ -75,7 +76,7 @@ export default function SuperAdminPage() {
   return <Suspense><SuperAdmin /></Suspense>;
 }
 
-const SECTIONS: Section[] = ["overview", "approvals", "users", "subjects", "staff"];
+const SECTIONS: Section[] = ["overview", "approvals", "users", "subjects", "payments", "staff"];
 
 function SuperAdmin() {
   const { user } = useSession();
@@ -147,6 +148,7 @@ function SuperAdmin() {
     { id: "approvals", label: "Approvals", icon: ClipboardCheck, badge: pending.length },
     { id: "users", label: "Users", icon: Users },
     { id: "subjects", label: "Subjects", icon: Library },
+    { id: "payments", label: "Payments", icon: CreditCard },
     { id: "staff", label: "Add staff", icon: UserPlus },
   ];
 
@@ -194,6 +196,7 @@ function SuperAdmin() {
               {section === "approvals" && <ApprovalsSection pending={pending} busy={busy} onDecide={setStatus} />}
               {section === "users" && <UsersSection users={users} me={me} busy={busy} onDecide={setStatus} onSubject={setSubject} onPassword={setPassword} onDelete={setDeleting} />}
               {section === "subjects" && <SubjectsSection onToast={(ok, text) => { setToast({ ok, text }); reload(); }} />}
+              {section === "payments" && <PaymentsSection onToast={(ok, text) => setToast({ ok, text })} />}
               {section === "staff" && <StaffSection onCreated={(text) => { setToast({ ok: true, text }); reload(); }} onError={(text) => setToast({ ok: false, text })} />}
             </motion.div>
           </AnimatePresence>

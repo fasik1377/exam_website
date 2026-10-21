@@ -8,6 +8,7 @@ import SiteHeader from "@/app/components/home/SiteHeader";
 import HeroQuiz from "@/app/components/home/HeroQuiz";
 import SupportChat from "@/app/components/home/SupportChat";
 import SubjectMarquee from "@/app/components/home/SubjectMarquee";
+import PricingNote from "@/app/components/home/PricingNote";
 
 
 const STEPS = [
@@ -120,7 +121,7 @@ export default function Home() {
           <Reveal>
             <SectionLabel>Simple subscription</SectionLabel>
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Unlock your full exam preparation.</h2>
-            <p className="mt-4 max-w-md leading-7 text-slate-500">Start free with the first 10 questions of every subject. Subscribe to get the complete question bank, every explanation, and teacher support.</p>
+            <PricingNote />
             <p className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-xs font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200">
               <ShieldCheck size={16} className="text-royal" /> Online checkout with Ethiopian payment providers is coming soon.
             </p>
