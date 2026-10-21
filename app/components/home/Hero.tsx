@@ -4,7 +4,7 @@ import { useReducedMotionSafe } from "@/app/components/useReducedMotionSafe";
 import { ArrowRight, Atom, BookOpenText, CheckCircle2, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { SUBJECTS } from "@/lib/subjects";
+import { useSubjects } from "@/app/components/useSubjects";
 import GeoGlobe from "./GeoGlobe";
 import HistoryTimeline from "./HistoryTimeline";
 import KnowledgeNetwork from "./KnowledgeNetwork";
@@ -22,15 +22,17 @@ const CHIPS = [
 const STATS = [
   { value: 4, label: "Grades (9–12)" },
   { value: 2, label: "Streams" },
-  { value: SUBJECTS.length, label: "Exam subjects" },
+  { value: 0, label: "Exam subjects" }, // filled with the live subject count
   { value: 10, label: "Free questions per subject" },
 ];
 
-const NATURAL = SUBJECTS.filter((s) => s.streams.length === 1 && s.streams[0] === "natural").map((s) => s.name);
-const SOCIAL = SUBJECTS.filter((s) => s.streams.length === 1 && s.streams[0] === "social").map((s) => s.name);
-const COMMON = SUBJECTS.filter((s) => s.streams.length > 1).map((s) => s.name);
 
 export default function Hero() {
+  const SUBJECTS = useSubjects();
+  const NATURAL = SUBJECTS.filter((s) => s.streams.length === 1 && s.streams[0] === "natural").map((s) => s.name);
+  const SOCIAL = SUBJECTS.filter((s) => s.streams.length === 1 && s.streams[0] === "social").map((s) => s.name);
+  const COMMON = SUBJECTS.filter((s) => s.streams.length > 1).map((s) => s.name);
+  const stats = STATS.map((s) => (s.label === "Exam subjects" ? { ...s, value: SUBJECTS.length } : s));
   const reduce = useReducedMotionSafe();
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
@@ -117,7 +119,7 @@ export default function Hero() {
 
       <div className="relative border-t border-white/10 bg-white/3">
         <dl className="mx-auto grid max-w-7xl grid-cols-2 gap-6 px-5 py-8 sm:grid-cols-4 lg:px-8">
-          {STATS.map((stat, i) => (
+          {stats.map((stat, i) => (
             <motion.div key={stat.label} className="flex flex-col-reverse" initial={reduce ? false : { opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}>
               <dt className="mt-1 text-xs font-semibold uppercase tracking-wider text-white/55">{stat.label}</dt>
               <dd className="text-3xl font-extrabold text-white"><CountUp to={stat.value} /></dd>

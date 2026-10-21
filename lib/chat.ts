@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
-import { SUBJECTS } from "@/lib/subjects";
+import { getSubjects } from "@/lib/subjectStore";
 import type { PublicUser } from "@/lib/types";
 
 /**
@@ -17,6 +17,7 @@ export type DbChat = {
   name?: string;
   subject?: string | null;
   description?: string;
+  hidden?: boolean;
   lastMessage: string;
   lastMessageAt: Date;
   lastSenderName: string;
@@ -36,10 +37,28 @@ export type DbChatMessage = {
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-export const ROOMS = [
-  { key: "room:general", name: "General lounge", subject: null, description: "Say hello, share study tips and exam news" },
-  ...SUBJECTS.map((s) => ({ key: `room:${slug(s.name)}`, name: `${s.name} room`, subject: s.name, description: `Questions and discussion about ${s.name}` })),
-];
+/**
+ * One study room per subject (plus the general lounge), kept in step with the subject list:
+ * new subjects get a room, renamed subjects rename theirs, hidden subjects hide theirs.
+ */
+export async function syncRooms() {
+  const db = await getDb();
+  const subjects = await getSubjects({ includeHidden: true });
+  const now = new Date();
+  const insertDefaults = { kind: "room" as const, lastMessage: "", lastMessageAt: new Date(0), lastSenderName: "", createdAt: now };
+  await db.collection<DbChat>("chats").bulkWrite([
+    { updateOne: { filter: { key: "room:general" }, update: { $set: { name: "General lounge", subject: null, description: "Say hello, share study tips and exam news", hidden: false }, $setOnInsert: insertDefaults }, upsert: true } },
+    ...subjects.map((s) => ({
+      updateOne: {
+        filter: { kind: "room" as const, subject: s.name },
+        update: { $set: { name: `${s.name} room`, description: `Questions and discussion about ${s.name}`, hidden: Boolean(s.hidden) }, $setOnInsert: { ...insertDefaults, key: `room:${slug(s.name)}-${s.id}` } },
+        upsert: true,
+      },
+    })),
+  ]);
+  // Rooms whose subject no longer exists disappear from the list.
+  await db.collection("chats").updateMany({ kind: "room", subject: { $nin: [null, ...subjects.map((s) => s.name)] } }, { $set: { hidden: true } });
+}
 
 /** Only approved students and teachers chat; the platform admin oversees but does not take part. */
 export const canChat = (user: PublicUser) => user.role === "student" || user.role === "admin";
@@ -60,14 +79,7 @@ export function ensureChat() {
         db.collection("chat_messages").createIndex({ senderId: 1, createdAt: -1 }),
         db.collection("chat_reads").createIndex({ chatId: 1, userId: 1 }, { unique: true }),
       ]);
-      const now = new Date();
-      await db.collection<DbChat>("chats").bulkWrite(ROOMS.map((room) => ({
-        updateOne: {
-          filter: { key: room.key },
-          update: { $set: { name: room.name, subject: room.subject, description: room.description }, $setOnInsert: { kind: "room", lastMessage: "", lastMessageAt: new Date(0), lastSenderName: "", createdAt: now } },
-          upsert: true,
-        },
-      })));
+      await syncRooms();
     })().catch((error) => { globalChat.chatSetup = undefined; throw error; });
   }
   return globalChat.chatSetup;
@@ -80,6 +92,7 @@ export async function findChat(id: unknown, user: PublicUser) {
   const chat = await db.collection<DbChat>("chats").findOne({ _id: new ObjectId(id) });
   if (!chat) return null;
   if (chat.kind === "direct" && !chat.participants?.some((p) => p.toString() === user.id)) return null;
+  if (chat.kind === "room" && chat.hidden) return null;
   return chat;
 }
 
@@ -103,7 +116,7 @@ export async function totalUnread(user: PublicUser) {
   if (!canChat(user)) return 0;
   await ensureChat();
   const db = await getDb();
-  const chats = await db.collection<DbChat>("chats").find({ $or: [{ kind: "room" }, { participants: new ObjectId(user.id) }] }).toArray();
+  const chats = await db.collection<DbChat>("chats").find({ $or: [{ kind: "room", hidden: { $ne: true } }, { participants: new ObjectId(user.id) }] }).toArray();
   const counts = await unreadCounts(user.id, chats);
   return [...counts.values()].reduce((a, b) => a + b, 0);
 }

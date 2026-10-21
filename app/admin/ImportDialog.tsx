@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Check, CheckCircle2, Download, FileText, ListChecks, LoaderCircle, ToggleLeft, Trash2, UploadCloud, X } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { TEMPLATE, convertType, validate, type ParsedQuestion, type QuestionType } from "@/lib/questionParser";
-import { SUBJECTS } from "@/lib/subjects";
+import { useSubjects } from "@/app/components/useSubjects";
 
 const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 const ACCEPT = ".doc,.docx,.pdf,.txt";
@@ -12,6 +12,7 @@ type Props = { defaultSubject?: string; lockSubject?: boolean; onClose: () => vo
 
 /** Upload a .docx / .pdf / .txt exam paper, review the questions found in it, then publish them in one go. */
 export default function ImportDialog({ defaultSubject, lockSubject = false, onClose, onPublished }: Props) {
+  const SUBJECTS = useSubjects();
   const [meta, setMeta] = useState({ subject: defaultSubject || "Mathematics", grade: "Grade 12", unit: "", year: "2016 E.C." });
   const [stage, setStage] = useState<"upload" | "reading" | "review">("upload");
   const [fileName, setFileName] = useState("");

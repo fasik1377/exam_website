@@ -9,7 +9,7 @@ import type { DbQuestion, DbUser } from "@/lib/types";
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireUser(["admin", "super-admin"]); if (auth.error) return auth.error;
-    const scope = monitoredSubject(auth.user, new URL(request.url).searchParams.get("subject"));
+    const scope = await monitoredSubject(auth.user, new URL(request.url).searchParams.get("subject"));
     if ("error" in scope) return scope.error;
     const { id } = await params;
     if (!ObjectId.isValid(id)) return Response.json({ error: "Student not found" }, { status: 404 });

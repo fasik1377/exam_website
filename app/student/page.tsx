@@ -1,18 +1,32 @@
 "use client";
 import { motion } from "framer-motion";
-import { ArrowRight, Atom, BookOpenText, CheckCircle2, Flame, Hash, MessageCircle, Target, Trophy, XCircle } from "lucide-react";
+import { ArrowRight, Atom, BookOpenText, CheckCircle2, Clock3, Hash, MessageCircle, Rocket, Target, Trophy, XCircle, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
-import { GRADES, STREAMS, needsStream, streamLabel, subjectsForStudent, type Stream } from "@/lib/subjects";
+import { useSubjects } from "@/app/components/useSubjects";
+import { GRADES, STREAMS, needsStream, secondsPerQuestion, streamLabel, subjectsForStudent, type Stream } from "@/lib/subjects";
+import { Badges, Leaderboard, LevelCard, WeekActivity, type Badge, type Level } from "./Engagement";
 
 type Summary = {
   user: { name: string; plan: string; grade?: string | null; stream?: Stream | null };
-  total: number; correct: number; week: number; streak: number; unread: number;
+  total: number; correct: number; week: number; weekXp: number; streak: number; unread: number;
+  level: Level; today: number; dailyGoal: number;
+  activity: { date: string; count: number; correct: number }[];
+  badges: Badge[];
+  recommendation: { subject: string; reason: string } | null;
   subjects: { subject: string; total: number; correct: number }[];
-  recent: { prompt: string; subject: string; correct: boolean; createdAt: string }[];
+  recent: { prompt: string; subject: string; correct: boolean; timedOut?: boolean; createdAt: string }[];
 };
+
+const TIPS = [
+  "Little and often beats cramming — 10 questions a day adds up to 3,650 a year.",
+  "Read every explanation, even when you're right. That's where the learning sticks.",
+  "Stuck? Ask a teacher in Messages — no question is too small.",
+  "Mix subjects: switching topics helps you remember more.",
+  "Answering against the clock now makes exam day feel familiar.",
+];
 
 
 async function fetchSummary(): Promise<Summary | null> {
@@ -23,6 +37,7 @@ async function fetchSummary(): Promise<Summary | null> {
 
 /** Student home: progress, where to practise next, and quick access to chat. */
 export default function StudentDashboard() {
+  const subjectList = useSubjects();
   const [data, setData] = useState<Summary | null>(null);
   const [editing, setEditing] = useState(false);
   const grade = data?.user.grade ?? null;
@@ -35,12 +50,15 @@ export default function StudentDashboard() {
   }, []);
 
   const accuracy = data?.total ? Math.round((data.correct / data.total) * 100) : 0;
+  const earned = data?.badges.filter((b) => b.earned).length ?? 0;
   const tiles = [
     { label: "Questions answered", value: data?.total ?? "–", icon: Target, tint: "bg-blue-50 text-royal" },
     { label: "Accuracy", value: data ? `${accuracy}%` : "–", icon: Trophy, tint: "bg-amber-50 text-amber-600" },
-    { label: "This week", value: data?.week ?? "–", icon: CheckCircle2, tint: "bg-green-50 text-green-600" },
-    { label: "Day streak", value: data ? `${data.streak} 🔥` : "–", icon: Flame, tint: "bg-orange-50 text-orange-600" },
+    { label: "XP this week", value: data?.weekXp ?? "–", icon: Zap, tint: "bg-violet-50 text-violet-600" },
+    { label: "Badges earned", value: data ? `${earned}/${data.badges.length}` : "–", icon: CheckCircle2, tint: "bg-green-50 text-green-600" },
   ];
+  const tip = TIPS[new Date().getDate() % TIPS.length];
+  const examLink = (subject: string) => `/exam?grade=${encodeURIComponent(grade ?? "Grade 12")}&subject=${encodeURIComponent(subject)}`;
 
   return (
     <main className="min-h-screen bg-[#f3f6fb] text-navy">
@@ -65,8 +83,24 @@ export default function StudentDashboard() {
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Welcome back{data ? `, ${data.user.name.split(" ")[0]}` : ""} 👋</h1>
             <p className="mt-2 max-w-xl text-white/75">{data?.streak ? `You're on a ${data.streak}-day streak — keep it going!` : "Answer a few questions today to start your streak."}</p>
             <p className="mt-1 font-amharic text-sm text-white/55">ዕውቀት ለሁሉም፣ ስኬት ለሁሉም።</p>
+            <div className="mt-6 border-t border-white/10 pt-6">
+              {data ? <LevelCard level={data.level} today={data.today} goal={data.dailyGoal} streak={data.streak} /> : <div className="h-24 animate-pulse rounded-2xl bg-white/10" />}
+            </div>
           </div>
         </section>
+
+        {/* Recommended next step */}
+        {data?.recommendation && grade && (
+          <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 rounded-3xl border-2 border-gold/60 bg-gradient-to-r from-amber-50 to-white p-5 sm:flex-row sm:items-center">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gold text-navy"><Rocket size={22} /></span>
+            <div className="flex-1">
+              <p className="text-xs font-bold uppercase tracking-[.16em] text-amber-700">Recommended for you</p>
+              <p className="text-lg font-extrabold">Practise {data.recommendation.subject}</p>
+              <p className="text-sm text-slate-600">{data.recommendation.reason}</p>
+            </div>
+            <Link href={examLink(data.recommendation.subject)} className="btn-shine inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-5 py-3 text-sm font-bold text-white hover:bg-royal">Start now <ArrowRight size={16} /></Link>
+          </motion.section>
+        )}
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {tiles.map((t, i) => (
@@ -79,7 +113,7 @@ export default function StudentDashboard() {
         </div>
 
         {/* Practise — based on the student's grade and stream */}
-        <section className="rounded-3xl border border-slate-200 bg-white p-6">
+        <section id="practise" className="scroll-mt-20 rounded-3xl border border-slate-200 bg-white p-6">
           {data && (!grade || editing) ? (
             <GradeEditor
               initialGrade={grade}
@@ -93,7 +127,7 @@ export default function StudentDashboard() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-extrabold">Start practising</h2>
-                  <p className="text-sm text-slate-500">Questions for your grade{needsStream(grade) ? " and stream" : ""}.</p>
+                  <p className="text-sm text-slate-500">Timed questions for your grade{needsStream(grade) ? " and stream" : ""} — earn XP for every answer.</p>
                 </div>
                 {grade && (
                   <div className="flex items-center gap-2">
@@ -105,10 +139,13 @@ export default function StudentDashboard() {
                 )}
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {grade && subjectsForStudent(grade, stream).map((s) => (
-                  <Link key={s.name} href={`/exam?grade=${encodeURIComponent(grade)}&subject=${encodeURIComponent(s.name)}`} className="card-lift group flex items-center gap-3 rounded-2xl border border-slate-200 p-4">
+                {grade && subjectsForStudent(grade, stream, subjectList).map((s) => (
+                  <Link key={s.name} href={examLink(s.name)} className="card-lift group flex items-center gap-3 rounded-2xl border border-slate-200 p-4">
                     <span className="grid h-10 w-10 place-items-center rounded-xl bg-royal/10 font-extrabold text-royal">{s.name.charAt(0)}</span>
-                    <span className="flex-1"><span className="block font-bold">{s.name}</span><span className="font-amharic text-xs text-slate-500">{s.amharic}</span></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-bold">{s.name}</span>
+                      <span className="flex items-center gap-2 text-xs text-slate-500"><span className="truncate font-amharic">{s.amharic}</span><span className="inline-flex shrink-0 items-center gap-0.5"><Clock3 size={11} />{secondsPerQuestion(s.name, subjectList) / 60} min/q</span></span>
+                    </span>
                     <ArrowRight size={16} className="text-slate-400 transition group-hover:translate-x-1 group-hover:text-navy" />
                   </Link>
                 ))}
@@ -116,6 +153,29 @@ export default function StudentDashboard() {
               </div>
             </>
           )}
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div><h2 className="text-lg font-extrabold">This week</h2><p className="text-sm text-slate-500">Answers per day · goal {data?.dailyGoal ?? 10} a day</p></div>
+              <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">{data?.week ?? 0} answers</span>
+            </div>
+            <div className="mt-5">{data ? <WeekActivity days={data.activity} goal={data.dailyGoal} /> : <div className="h-36 animate-pulse rounded-2xl bg-slate-100" />}</div>
+            <p className="mt-4 rounded-xl bg-blue-50 p-3 text-sm text-slate-700"><b className="text-royal">Study tip:</b> {tip}</p>
+          </section>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6">
+            <h2 className="flex items-center gap-2 text-lg font-extrabold"><Trophy size={18} className="text-gold" /> Leaderboard</h2>
+            <div className="mt-2"><Leaderboard /></div>
+          </section>
+        </div>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div><h2 className="text-lg font-extrabold">Achievements</h2><p className="text-sm text-slate-500">Unlock badges as you practise.</p></div>
+            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">{earned} unlocked</span>
+          </div>
+          <div className="mt-5">{data ? <Badges badges={data.badges} /> : <div className="h-32 animate-pulse rounded-2xl bg-slate-100" />}</div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -143,8 +203,8 @@ export default function StudentDashboard() {
               <ul className="mt-4 grid gap-2.5">
                 {data.recent.map((r, i) => (
                   <li key={i} className="flex items-start gap-3 rounded-xl border border-slate-100 p-3">
-                    {r.correct ? <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-green-600" /> : <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />}
-                    <span className="min-w-0"><span className="line-clamp-1 text-sm font-semibold">{r.prompt}</span><span className="text-xs text-slate-500">{r.subject}</span></span>
+                    {r.correct ? <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-green-600" /> : r.timedOut ? <Clock3 size={18} className="mt-0.5 shrink-0 text-amber-500" /> : <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />}
+                    <span className="min-w-0"><span className="line-clamp-1 text-sm font-semibold">{r.prompt}</span><span className="text-xs text-slate-500">{r.subject}{r.timedOut ? " · time ran out" : ""}</span></span>
                   </li>
                 ))}
               </ul>

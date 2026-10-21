@@ -2,7 +2,7 @@
 import { AnimatePresence, animate, motion } from "framer-motion";
 import {
   AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, LayoutDashboard, LoaderCircle,
-  KeyRound, Mail, MessageCircle, Trash2, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
+  KeyRound, Library, Mail, MessageCircle, Trash2, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -10,7 +10,9 @@ import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent, ty
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
-import { SUBJECTS, streamLabel } from "@/lib/subjects";
+import { streamLabel } from "@/lib/subjects";
+import { useSubjects } from "@/app/components/useSubjects";
+import SubjectsSection from "./SubjectsSection";
 import { AccuracyBars, DailyStacked, Heatmap, Meter, SERIES, STATUS, Sparkline, StackedBar, SubjectBars, TrendChart } from "./charts";
 
 type Status = "pending" | "active" | "restricted" | "banned" | "rejected";
@@ -31,7 +33,7 @@ type Overview = {
   questionsBySubject: { subject: string; count: number }[];
   recentQuestions: { id: string; prompt: string; subject: string; teacher: string; createdAt: string }[];
 };
-type Section = "overview" | "approvals" | "users" | "staff";
+type Section = "overview" | "approvals" | "users" | "subjects" | "staff";
 
 const ROLE_LABEL: Record<string, string> = { student: "Student", admin: "Teacher", "super-admin": "Platform admin" };
 const STATUS_META: Record<Status, { label: string; color: string; icon: LucideIcon; pill: string }> = {
@@ -73,7 +75,7 @@ export default function SuperAdminPage() {
   return <Suspense><SuperAdmin /></Suspense>;
 }
 
-const SECTIONS: Section[] = ["overview", "approvals", "users", "staff"];
+const SECTIONS: Section[] = ["overview", "approvals", "users", "subjects", "staff"];
 
 function SuperAdmin() {
   const { user } = useSession();
@@ -144,6 +146,7 @@ function SuperAdmin() {
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "approvals", label: "Approvals", icon: ClipboardCheck, badge: pending.length },
     { id: "users", label: "Users", icon: Users },
+    { id: "subjects", label: "Subjects", icon: Library },
     { id: "staff", label: "Add staff", icon: UserPlus },
   ];
 
@@ -190,6 +193,7 @@ function SuperAdmin() {
               {section === "overview" && <OverviewSection name={user?.name} users={users} overview={overview} pending={pending} busy={busy} onDecide={setStatus} goTo={setSection} updatedAt={updatedAt} />}
               {section === "approvals" && <ApprovalsSection pending={pending} busy={busy} onDecide={setStatus} />}
               {section === "users" && <UsersSection users={users} me={me} busy={busy} onDecide={setStatus} onSubject={setSubject} onPassword={setPassword} onDelete={setDeleting} />}
+              {section === "subjects" && <SubjectsSection onToast={(ok, text) => { setToast({ ok, text }); reload(); }} />}
               {section === "staff" && <StaffSection onCreated={(text) => { setToast({ ok: true, text }); reload(); }} onError={(text) => setToast({ ok: false, text })} />}
             </motion.div>
           </AnimatePresence>
@@ -243,6 +247,7 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo,
   name?: string; users: Account[]; overview: Overview | null; pending: Account[]; busy: string[];
   onDecide: (ids: string[], status: Status, verb: string) => void; goTo: (s: Section) => void; updatedAt: Date | null;
 }) {
+  const SUBJECTS = useSubjects();
   const [metric, setMetric] = useState<Metric>("signups");
   const count = (fn: (u: Account) => boolean) => users.filter(fn).length;
   const accuracy = overview && overview.attemptTotal ? (overview.attemptCorrect / overview.attemptTotal) * 100 : 0;
@@ -481,6 +486,7 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo,
 const formatHours = (h: number) => (h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 48 ? `${h.toFixed(1)} h` : `${(h / 24).toFixed(1)} days`);
 
 function TeachersBySubject({ users }: { users: Account[] }) {
+  const SUBJECTS = useSubjects();
   const teachers = users.filter((u) => u.role === "admin");
   const groups = [...SUBJECTS.map((s) => s.name), "Unassigned"].map((subject) => {
     const list = teachers.filter((t) => (t.subject || "Unassigned") === subject);
@@ -646,6 +652,7 @@ function AllCaughtUp() {
 /* ---------------- Users ---------------- */
 
 function UsersSection({ users, me, busy, onDecide, onSubject, onPassword, onDelete }: { users: Account[]; me: string; busy: string[]; onDecide: (ids: string[], status: Status, verb: string) => void; onSubject: (id: string, subject: string) => void; onPassword: (user: Account) => void; onDelete: (user: Account) => void }) {
+  const SUBJECTS = useSubjects();
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
   const [status, setStatus] = useState<"all" | Status>("all");
@@ -817,6 +824,7 @@ function DeleteAccountDialog({ account, onClose, onDeleted }: { account: Account
 /* ---------------- Staff ---------------- */
 
 function StaffSection({ onCreated, onError }: { onCreated: (text: string) => void; onError: (text: string) => void }) {
+  const SUBJECTS = useSubjects();
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "admin", subject: "" });
   const [loading, setLoading] = useState(false);
 

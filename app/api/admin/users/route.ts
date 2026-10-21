@@ -4,10 +4,10 @@ import { notifyDecision } from "@/lib/mail";
 import { apiError, cleanString, readJson } from "@/lib/api";
 import { hashPassword, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { SUBJECTS } from "@/lib/subjects";
+import { findSubject } from "@/lib/subjectStore";
 import type { UserStatus } from "@/lib/types";
 
-const validSubject = (value: unknown) => SUBJECTS.some((s) => s.name === value);
+const validSubject = async (value: unknown) => Boolean(await findSubject(value));
 /** The platform owner (SUPER_ADMIN_EMAIL) can never be deleted from the dashboard. */
 const isOwner = (email: string) => email.toLowerCase() === (process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase();
 
@@ -43,7 +43,7 @@ export async function PATCH(request: Request) {
     // Assigning a teacher's subject is a separate, single-account update.
     if (body.subject !== undefined) {
       const id = cleanString(body.id, 40);
-      if (!ObjectId.isValid(id) || !validSubject(body.subject)) return Response.json({ error: "Choose a valid subject" }, { status: 400 });
+      if (!ObjectId.isValid(id) || !(await validSubject(body.subject))) return Response.json({ error: "Choose a valid subject" }, { status: 400 });
       const db = await getDb();
       const result = await db.collection("users").updateOne({ _id: new ObjectId(id), role: "admin" }, { $set: { subject: body.subject, updatedAt: new Date() } });
       if (!result.matchedCount) return Response.json({ error: "Teacher not found" }, { status: 404 });
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     const body = await readJson(request);
     const name = cleanString(body.name, 80), email = cleanString(body.email, 160).toLowerCase(), password = typeof body.password === "string" ? body.password : "";
     const role = body.role === "super-admin" ? "super-admin" : "admin";
-    if (role === "admin" && !validSubject(body.subject)) return Response.json({ error: "Choose the teacher's subject" }, { status: 400 });
+    if (role === "admin" && !(await validSubject(body.subject))) return Response.json({ error: "Choose the teacher's subject" }, { status: 400 });
     if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) return Response.json({ error: "Enter a valid name, email, and password of at least 8 characters" }, { status: 400 });
     const db = await getDb(); if (await db.collection("users").findOne({ email })) return Response.json({ error: "An account with this email already exists" }, { status: 409 });
     const now = new Date(); await db.collection("users").insertOne({ name, email, passwordHash: await hashPassword(password), role, status: "active", plan: "teacher", ...(role === "admin" ? { subject: body.subject } : {}), createdAt: now, updatedAt: now, reviewedAt: now, reviewedBy: new ObjectId(auth.user.id) });

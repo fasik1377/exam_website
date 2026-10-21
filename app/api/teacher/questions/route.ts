@@ -9,7 +9,7 @@ import type { DbQuestion } from "@/lib/types";
 export async function GET(request: Request) {
   try {
     const auth = await requireUser(["admin", "super-admin"]); if (auth.error) return auth.error;
-    const scope = monitoredSubject(auth.user, new URL(request.url).searchParams.get("subject"));
+    const scope = await monitoredSubject(auth.user, new URL(request.url).searchParams.get("subject"));
     if ("error" in scope) return scope.error;
     const db = await getDb();
     const questions = await db.collection<DbQuestion>("questions").find({ subject: scope.subject }).sort({ createdAt: -1 }).limit(500).toArray();

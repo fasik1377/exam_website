@@ -6,12 +6,14 @@ import { useState, type FormEvent } from "react";
 import AuthShell, { Field, FormError, SubmitButton } from "@/app/components/AuthShell";
 import { SignedInCard } from "@/app/components/PortalLogin";
 import { useSession } from "@/app/components/useSession";
-import { GRADES, STREAMS, SUBJECTS, needsStream, subjectsFor, type Stream } from "@/lib/subjects";
+import { GRADES, STREAMS, needsStream, subjectsFor, type Stream } from "@/lib/subjects";
+import { useSubjects } from "@/app/components/useSubjects";
 
 type Role = "student" | "teacher";
 
 /** General sign-in (every role is routed to its own dashboard) and student/teacher registration. */
 export default function StudentAuthForm({ mode, initialRole = "student" }: { mode: "login" | "signup"; initialRole?: Role }) {
+  const SUBJECTS = useSubjects();
   const { user } = useSession();
   const [form, setForm] = useState({ name: "", email: "", password: "", subject: "" });
   const [grade, setGrade] = useState<string>("");
@@ -120,7 +122,7 @@ export default function StudentAuthForm({ mode, initialRole = "student" }: { mod
                               </button>
                             ))}
                           </div>
-                          {stream && <p className="mt-2 text-xs text-slate-500">Subjects: {subjectsFor(stream).map((x) => x.name).join(", ")}</p>}
+                          {stream && <p className="mt-2 text-xs text-slate-500">Subjects: {subjectsFor(stream, SUBJECTS).map((x) => x.name).join(", ")}</p>}
                         </motion.div>
                       )}
                     </AnimatePresence>

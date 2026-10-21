@@ -4,6 +4,7 @@ import { ArrowRight, Atom, BookOpenText, Brain, Calculator, Dna, FlaskConical, G
 import Link from "next/link";
 import { useState } from "react";
 import { useSession } from "@/app/components/useSession";
+import { useSubjects } from "@/app/components/useSubjects";
 import { STREAMS, isCommon, needsStream, subjectsForStudent, type Stream } from "@/lib/subjects";
 
 const GRADES = [
@@ -39,7 +40,8 @@ function Picker({ initialGrade, initialStream, personal }: { initialGrade: strin
   const [stream, setStream] = useState<Stream>(initialStream);
   const withStream = needsStream(grade);
   // Grades 9–10 study every subject; Grades 11–12 follow their stream.
-  const subjects = subjectsForStudent(grade, stream);
+  const all = useSubjects();
+  const subjects = subjectsForStudent(grade, stream, all);
 
   return (
     <div>

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
-import { SUBJECTS as ALL_SUBJECTS } from "@/lib/subjects";
+import { useSubjects } from "@/app/components/useSubjects";
 import ImportDialog from "./ImportDialog";
 import QuestionsPanel, { type QuestionRow } from "./QuestionsPanel";
 import ResultsPanel, { type StudentRow } from "./ResultsPanel";
@@ -15,7 +15,6 @@ import TeacherOverview, { type Overview } from "./TeacherOverview";
 type Tab = "overview" | "questions" | "results";
 
 const initial = { type: "mcq" as "mcq" | "truefalse", subject: "Mathematics", grade: "Grade 12", unit: "Unit 1", year: "2016 E.C.", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
-const SUBJECTS = ALL_SUBJECTS.map((s) => s.name);
 const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 
 async function getJson<T>(url: string): Promise<{ data?: T; error?: string }> {
@@ -30,7 +29,8 @@ export default function TeacherDashboard() {
   const { user } = useSession();
   const isTeacher = user?.role === "admin";
   const [tab, setTab] = useState<Tab>("overview");
-  const [chosenSubject, setChosenSubject] = useState(SUBJECTS[0]);
+  const SUBJECTS = useSubjects().map((s) => s.name);
+  const [chosenSubject, setChosenSubject] = useState("Mathematics");
   // Teachers are locked to their own subject on the server; the super admin can browse any subject.
   const subjectQuery = user && !isTeacher ? `?subject=${encodeURIComponent(chosenSubject)}` : "";
   const [overview, setOverview] = useState<Overview | null>(null);

@@ -3,7 +3,8 @@ import { ensureDatabase, hashPassword } from "@/lib/auth";
 import { notifyNewRegistration, notifyRegistrationReceived } from "@/lib/mail";
 import { apiError, cleanString, readJson } from "@/lib/api";
 import { getDb } from "@/lib/db";
-import { SUBJECTS, parseGradeStream } from "@/lib/subjects";
+import { parseGradeStream } from "@/lib/subjects";
+import { findSubject } from "@/lib/subjectStore";
 import type { DbUser } from "@/lib/types";
 
 /** Students and teachers register here; every new account waits for super-admin approval before it can sign in. */
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
     if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) {
       return Response.json({ error: "Enter a valid name, email, and password of at least 8 characters" }, { status: 400 });
     }
-    if (role === "admin" && !SUBJECTS.some((s) => s.name === subject)) {
+    if (role === "admin" && !(await findSubject(subject))) {
       return Response.json({ error: "Choose the subject you teach" }, { status: 400 });
     }
     // Students: grade 9–12, and Natural/Social stream for Grades 11–12 (questions are shown by grade and stream).

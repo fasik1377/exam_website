@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CheckCircle2, CreditCard, Lightbulb, MessageCircle, MousePointerClick, ShieldCheck, Sparkles, Target, Trophy } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, CreditCard, Lightbulb, MessageCircle, MousePointerClick, ShieldCheck, Target, Trophy } from "lucide-react";
 import Link from "next/link";
 import Brand from "@/app/components/Brand";
 import Reveal from "@/app/components/Reveal";
@@ -7,9 +7,8 @@ import Hero from "@/app/components/home/Hero";
 import SiteHeader from "@/app/components/home/SiteHeader";
 import HeroQuiz from "@/app/components/home/HeroQuiz";
 import SupportChat from "@/app/components/home/SupportChat";
-import { SUBJECTS } from "@/lib/subjects";
+import SubjectMarquee from "@/app/components/home/SubjectMarquee";
 
-const MARQUEE = [...SUBJECTS.map((s) => `${s.name} · ${s.amharic}`), "Natural Science", "Social Science"];
 
 const STEPS = [
   { icon: MousePointerClick, title: "Choose grade, stream & subject", text: "Pick your grade, then Natural or Social Science, then any subject aligned with the Ethiopian curriculum." },
@@ -48,13 +47,7 @@ export default function Home() {
       <Hero />
 
       {/* Subject marquee */}
-      <div className="overflow-hidden border-b border-slate-200 bg-white py-4" aria-hidden>
-        <div className="marquee gap-10 font-amharic text-sm font-bold text-slate-400">
-          {[...MARQUEE, ...MARQUEE].map((item, i) => (
-            <span key={i} className="flex items-center gap-10 whitespace-nowrap">{item}<Sparkles size={14} className="text-gold" /></span>
-          ))}
-        </div>
-      </div>
+      <SubjectMarquee />
 
       {/* Try a question */}
       <section id="try" className="relative overflow-hidden bg-white">

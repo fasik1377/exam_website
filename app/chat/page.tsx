@@ -7,7 +7,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormE
 import AccountMenu from "@/app/components/AccountMenu";
 import Brand from "@/app/components/Brand";
 import { dashboardFor, useSession } from "@/app/components/useSession";
-import { SUBJECTS } from "@/lib/subjects";
+import { useSubjects } from "@/app/components/useSubjects";
 
 type Chat = {
   id: string; kind: "direct" | "room"; title: string; subtitle: string; subject: string | null;
@@ -173,6 +173,7 @@ function ChatList({ chats, activeId, onOpen, rooms, onFindPeople }: { chats: Cha
 }
 
 function PeopleDirectory({ initialSubject, onPick }: { initialSubject: string; onPick: (p: Person) => void }) {
+  const SUBJECTS = useSubjects();
   const [query, setQuery] = useState("");
   const [role, setRole] = useState<"" | "admin" | "student">(initialSubject ? "admin" : "");
   const [subject, setSubject] = useState(initialSubject);

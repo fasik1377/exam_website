@@ -3,6 +3,7 @@ import { apiError, cleanString, readJson } from "@/lib/api";
 import { ensureDatabase, requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import type { DbQuestion } from "@/lib/types";
+import { findSubject } from "@/lib/subjectStore";
 
 export async function GET(request: Request) {
   try {
@@ -49,14 +50,17 @@ export async function POST(request: Request) {
     const auth = await requireUser(["admin", "super-admin"]);
     if (auth.error) return auth.error;
     const body = await readJson(request);
-    const defaults: Defaults = { subject: cleanString(body.subject, 60), grade: cleanString(body.grade, 30), unit: cleanString(body.unit, 60), year: cleanString(body.year, 30) };
+    const defaults: Defaults = { subject: auth.user.role === "admin" ? auth.user.subject ?? "" : cleanString(body.subject, 60), grade: cleanString(body.grade, 30), unit: cleanString(body.unit, 60), year: cleanString(body.year, 30) };
     const items = Array.isArray(body.questions) ? (body.questions as Record<string, unknown>[]) : [body];
     if (!items.length || items.length > 300) return Response.json({ error: "Send between 1 and 300 questions" }, { status: 400 });
     const docs: Omit<DbQuestion, "_id">[] = [];
     for (const [index, item] of items.entries()) {
       const result = toQuestion(item && typeof item === "object" ? item : {}, defaults, auth.user);
       if (typeof result === "string") return Response.json({ error: items.length > 1 ? `Question ${index + 1}: ${result}` : result, index }, { status: 400 });
-      // Teachers can only publish in their own subject.
+      // Teachers can only publish in their own subject; anyone else must pick an existing subject.
+      if (auth.user.role !== "admin" && !(await findSubject(result.subject, { includeHidden: true }))) {
+        return Response.json({ error: `Unknown subject "${result.subject}"` }, { status: 400 });
+      }
       if (auth.user.role === "admin") {
         if (!auth.user.subject) return Response.json({ error: "Your account has no subject yet. Ask the platform administrator to assign one." }, { status: 409 });
         result.subject = auth.user.subject;

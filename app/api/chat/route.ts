@@ -12,7 +12,7 @@ export async function GET() {
     await ensureChat();
     const db = await getDb();
     const me = new ObjectId(auth.user.id);
-    const chats = await db.collection<DbChat>("chats").find({ $or: [{ kind: "room" }, { participants: me }] }).sort({ lastMessageAt: -1 }).limit(300).toArray();
+    const chats = await db.collection<DbChat>("chats").find({ $or: [{ kind: "room", hidden: { $ne: true } }, { participants: me }] }).sort({ lastMessageAt: -1 }).limit(300).toArray();
     // Profiles of the people on the other side of direct chats.
     const otherIds = chats.flatMap((c) => (c.kind === "direct" ? c.participants!.filter((p) => !p.equals(me)) : []));
     const people = await db.collection<DbUser>("users").find({ _id: { $in: otherIds } }, { projection: { name: 1, role: 1, subject: 1, status: 1 } }).toArray();

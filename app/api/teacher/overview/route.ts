@@ -10,7 +10,7 @@ const DAYS = 14;
 export async function GET(request: Request) {
   try {
     const auth = await requireUser(["admin", "super-admin"]); if (auth.error) return auth.error;
-    const scope = monitoredSubject(auth.user, new URL(request.url).searchParams.get("subject"));
+    const scope = await monitoredSubject(auth.user, new URL(request.url).searchParams.get("subject"));
     if ("error" in scope) return scope.error;
     const { subject } = scope;
     const db = await getDb();
