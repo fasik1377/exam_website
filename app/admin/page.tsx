@@ -1,12 +1,15 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { BarChart3, BookOpen, Check, FileUp, LayoutDashboard, ListChecks, LoaderCircle, MessageCircle, Plus, ShieldCheck, ToggleLeft, Trash2, X } from "lucide-react";
+import { BarChart3, BookOpen, Check, FileUp, LayoutDashboard, ListChecks, LoaderCircle, MessageCircle, Plus, ToggleLeft, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
 import { useSubjects } from "@/app/components/useSubjects";
+import GradePills from "@/app/components/GradePills";
+import BackButton from "@/app/components/BackButton";
+import { gradesFor } from "@/lib/subjects";
 import ImportDialog from "./ImportDialog";
 import QuestionsPanel, { type QuestionRow } from "./QuestionsPanel";
 import ResultsPanel, { type StudentRow } from "./ResultsPanel";
@@ -15,7 +18,6 @@ import TeacherOverview, { type Overview } from "./TeacherOverview";
 type Tab = "overview" | "questions" | "results";
 
 const initial = { type: "mcq" as "mcq" | "truefalse", subject: "Mathematics", grade: "Grade 12", unit: "Unit 1", year: "2016 E.C.", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
-const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 
 async function getJson<T>(url: string): Promise<{ data?: T; error?: string }> {
   const response = await fetch(url, { cache: "no-store" }).catch(() => null);
@@ -29,7 +31,8 @@ export default function TeacherDashboard() {
   const { user } = useSession();
   const isTeacher = user?.role === "admin";
   const [tab, setTab] = useState<Tab>("overview");
-  const SUBJECTS = useSubjects().map((s) => s.name);
+  const subjectList = useSubjects();
+  const SUBJECTS = subjectList.map((s) => s.name);
   const [chosenSubject, setChosenSubject] = useState("Mathematics");
   // Teachers are locked to their own subject on the server; the super admin can browse any subject.
   const subjectQuery = user && !isTeacher ? `?subject=${encodeURIComponent(chosenSubject)}` : "";
@@ -41,6 +44,9 @@ export default function TeacherDashboard() {
   const [open, setOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [form, setForm] = useState(initial);
+  // Only grades the subject is taught in; falls back to the first one when the subject changes.
+  const formGrades = gradesFor(form.subject, subjectList);
+  const formGrade = formGrades.includes(form.grade as (typeof formGrades)[number]) ? form.grade : formGrades[formGrades.length - 1];
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -91,13 +97,13 @@ export default function TeacherDashboard() {
     event.preventDefault();
     setError("");
     setSaving(true);
-    const response = await fetch("/api/questions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }).catch(() => null);
+    const response = await fetch("/api/questions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, grade: formGrade }) }).catch(() => null);
     setSaving(false);
     const data = await response?.json().catch(() => ({}));
     if (!response?.ok) return setError(data?.error || "Could not publish the question.");
     const another = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("name") === "another";
     // Keep subject/grade/unit/type when adding several questions in a row.
-    setForm({ ...initial, type: form.type, subject: form.subject, grade: form.grade, unit: form.unit, year: form.year, choices: form.type === "truefalse" ? ["True", "False"] : ["", "", "", ""] });
+    setForm({ ...initial, type: form.type, subject: form.subject, grade: formGrade, unit: form.unit, year: form.year, choices: form.type === "truefalse" ? ["True", "False"] : ["", "", "", ""] });
     if (!another) setOpen(false);
     setNotice({ ok: true, text: another ? "Question published — ready for the next one." : "Question published to the student exam bank." });
     load();
@@ -118,7 +124,7 @@ export default function TeacherDashboard() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3">
           <Brand size="sm" subtitle={isTeacher ? "Teacher" : "Question bank"} />
           <div className="flex items-center gap-2">
-            {user?.role === "super-admin" && <Link href="/super-admin" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-royal hover:bg-blue-50 sm:inline-flex"><ShieldCheck size={16} /> Platform admin</Link>}
+            {user?.role === "super-admin" && <BackButton href="/super-admin" label="Platform admin" className="text-royal" />}
             {isTeacher && (
               <Link href="/chat" className="relative inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-navy hover:bg-slate-100">
                 <MessageCircle size={17} /> <span className="hidden sm:inline">Messages</span>
@@ -211,7 +217,7 @@ export default function TeacherDashboard() {
               </div>
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-bold">Subject<select disabled={isTeacher} title={isTeacher ? "Teachers publish in their own subject" : undefined} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{SUBJECTS.map((s) => <option key={s}>{s}</option>)}</select></label>
-                <label className="text-sm font-bold">Grade<select value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{GRADES.map((g) => <option key={g}>{g}</option>)}</select></label>
+                <div className="sm:col-span-2"><GradePills value={formGrade} allowed={formGrades} subject={form.subject} label="Which grade is this question for?" onChange={(grade) => setForm({ ...form, grade })} /></div>
                 <label className="text-sm font-bold">Unit<input required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
                 <label className="text-sm font-bold">Exam year<input required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
               </div>

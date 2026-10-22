@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
-import { SUBJECTS, type Stream, type Subject } from "@/lib/subjects";
+import { GRADES, SUBJECTS, gradesOf, type Grade, type Stream, type Subject } from "@/lib/subjects";
 
 /** Subjects live in MongoDB so the super admin can manage them; this module is the only reader/writer. */
 export type DbSubject = {
@@ -8,6 +8,7 @@ export type DbSubject = {
   name: string;
   amharic: string;
   streams: Stream[];
+  grades?: Grade[];
   minutes: number;
   hidden: boolean;
   order: number;
@@ -27,14 +28,14 @@ function seed() {
       if (await db.collection("subjects").countDocuments()) return;
       const now = new Date();
       await db.collection<DbSubject>("subjects").insertMany(SUBJECTS.map((s, i) => ({
-        name: s.name, amharic: s.amharic, streams: s.streams, minutes: s.minutes ?? 1, hidden: false, order: i, createdAt: now, updatedAt: now,
+        name: s.name, amharic: s.amharic, streams: s.streams, grades: [...GRADES], minutes: s.minutes ?? 1, hidden: false, order: i, createdAt: now, updatedAt: now,
       })));
     })().catch((error) => { cache.subjectSeed = undefined; throw error; });
   }
   return cache.subjectSeed;
 }
 
-const toSubject = (s: DbSubject): Subject => ({ id: s._id!.toString(), name: s.name, amharic: s.amharic, streams: s.streams, minutes: s.minutes, hidden: s.hidden });
+const toSubject = (s: DbSubject): Subject => ({ id: s._id!.toString(), name: s.name, amharic: s.amharic, streams: s.streams, grades: gradesOf(s), minutes: s.minutes, hidden: s.hidden });
 
 /** All subjects (cached briefly). Pass `includeHidden` for admin views and validating existing data. */
 export async function getSubjects({ includeHidden = false } = {}): Promise<Subject[]> {

@@ -4,21 +4,27 @@ import { requireUser } from "@/lib/auth";
 import { syncRooms } from "@/lib/chat";
 import { getDb } from "@/lib/db";
 import { getSubjects, invalidateSubjects, type DbSubject } from "@/lib/subjectStore";
-import type { Stream } from "@/lib/subjects";
+import { GRADES, needsStream, type Stream } from "@/lib/subjects";
 
 /** Validates the editable fields of a subject. */
 function parse(body: Record<string, unknown>, partial: boolean) {
-  const out: Partial<Pick<DbSubject, "name" | "amharic" | "streams" | "minutes" | "hidden">> = {};
+  const out: Partial<Pick<DbSubject, "name" | "amharic" | "streams" | "grades" | "minutes" | "hidden">> = {};
   if (!partial || body.name !== undefined) {
     const name = cleanString(body.name, 60).replace(/\s+/g, " ");
     if (name.length < 2) return "Enter a subject name (at least 2 characters)";
     out.name = name;
   }
   if (!partial || body.amharic !== undefined) out.amharic = cleanString(body.amharic, 60);
+  if (!partial || body.grades !== undefined) {
+    const grades = GRADES.filter((g) => Array.isArray(body.grades) && body.grades.includes(g));
+    if (!grades.length) return "Choose at least one grade";
+    out.grades = grades;
+  }
   if (!partial || body.streams !== undefined) {
     const streams = (Array.isArray(body.streams) ? body.streams : []).filter((s): s is Stream => s === "natural" || s === "social");
-    if (!streams.length) return "Choose at least one stream (Natural, Social, or both)";
-    out.streams = [...new Set(streams)];
+    // Streams only apply in Grades 11–12; a Grade 9–10 subject is simply open to everyone.
+    if (!streams.length && (!out.grades || out.grades.some(needsStream))) return "Choose at least one stream (Natural, Social, or both)";
+    out.streams = streams.length ? [...new Set(streams)] : ["natural", "social"];
   }
   if (!partial || body.minutes !== undefined) {
     const minutes = Number(body.minutes ?? 1);
@@ -60,7 +66,7 @@ export async function POST(request: Request) {
     const last = await db.collection<DbSubject>("subjects").find().sort({ order: -1 }).limit(1).next();
     const now = new Date();
     try {
-      await db.collection<DbSubject>("subjects").insertOne({ name: fields.name!, amharic: fields.amharic ?? "", streams: fields.streams!, minutes: fields.minutes ?? 1, hidden: false, order: (last?.order ?? 0) + 1, createdAt: now, updatedAt: now });
+      await db.collection<DbSubject>("subjects").insertOne({ name: fields.name!, amharic: fields.amharic ?? "", streams: fields.streams!, grades: fields.grades!, minutes: fields.minutes ?? 1, hidden: false, order: (last?.order ?? 0) + 1, createdAt: now, updatedAt: now });
     } catch (error) {
       if ((error as { code?: number }).code === 11000) return Response.json({ error: "A subject with this name already exists" }, { status: 409 });
       throw error;

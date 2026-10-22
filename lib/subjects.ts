@@ -5,6 +5,8 @@ export type Subject = {
   name: string;
   amharic: string;
   streams: Stream[];
+  /** Grades the subject is taught in (all four when not set). */
+  grades?: Grade[];
   /** Exam time allowed per question, in minutes. */
   minutes?: number;
   /** Hidden subjects stay in the database but are not offered to students or new teachers. */
@@ -47,9 +49,24 @@ export const needsStream = (grade?: string | null) => grade === "Grade 11" || gr
 
 export const streamLabel = (stream?: string | null) => STREAMS.find((s) => s.id === stream)?.label ?? "";
 
-/** Subjects a student studies: their stream's subjects in Grades 11–12, every subject in Grades 9–10. */
-export const subjectsForStudent = (grade?: string | null, stream?: string | null, list: Subject[] = SUBJECTS) =>
-  needsStream(grade) && (stream === "natural" || stream === "social") ? subjectsFor(stream, list) : list;
+/** Grades a subject is offered in. */
+export const gradesOf = (subject?: Pick<Subject, "grades"> | null): Grade[] => (subject?.grades?.length ? GRADES.filter((g) => subject.grades!.includes(g)) : [...GRADES]);
+export const gradesFor = (name: string, list: Subject[] = SUBJECTS) => gradesOf(list.find((s) => s.name === name));
+
+/** "Grades 9–12", "Grades 11–12", "Grade 9, 11" … */
+export function gradeRange(grades: readonly string[]) {
+  const n = GRADES.map((g, i) => (grades.includes(g) ? i + 9 : 0)).filter(Boolean);
+  if (!n.length) return "No grades";
+  if (n.length === 1) return `Grade ${n[0]}`;
+  const contiguous = n.every((x, i) => i === 0 || x === n[i - 1] + 1);
+  return contiguous ? `Grades ${n[0]}–${n[n.length - 1]}` : `Grades ${n.join(", ")}`;
+}
+
+/** Subjects a student studies: those offered in their grade, limited to their stream in Grades 11–12. */
+export const subjectsForStudent = (grade?: string | null, stream?: string | null, list: Subject[] = SUBJECTS) => {
+  const inGrade = grade ? list.filter((s) => gradesOf(s).includes(grade as Grade)) : list;
+  return needsStream(grade) && (stream === "natural" || stream === "social") ? subjectsFor(stream, inGrade) : inGrade;
+};
 
 /** Validates a grade/stream pair from user input. Returns an error message or the clean values. */
 export function parseGradeStream(grade: unknown, stream: unknown): { grade: Grade; stream: Stream | null } | string {

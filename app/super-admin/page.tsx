@@ -1,7 +1,7 @@
 "use client";
 import { AnimatePresence, animate, motion } from "framer-motion";
 import {
-  AlertTriangle, BookOpen, Check, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, LayoutDashboard, LoaderCircle,
+  AlertTriangle, ArrowLeft, BookOpen, Globe, Check, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, LayoutDashboard, LoaderCircle,
   CreditCard, KeyRound, Library, Mail, MessageCircle, Trash2, RefreshCw, Search, Send, ShieldCheck, Ban, Sparkles, Target, UserPlus, Users, X, type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -161,6 +161,7 @@ function SuperAdmin() {
         <nav className="relative mt-10 grid gap-1">
           {nav.map((item) => <NavButton key={item.id} item={item} active={section === item.id} onClick={() => setSection(item.id)} />)}
           <Link href="/admin" className="mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/60 hover:bg-white/5 hover:text-white"><BookOpen size={18} /> Question bank</Link>
+          <Link href="/" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/60 hover:bg-white/5 hover:text-white"><Globe size={18} /> Visit website</Link>
         </nav>
         <div className="relative mt-auto">
           <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-white/40">Signed in</p>
@@ -183,7 +184,8 @@ function SuperAdmin() {
 
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-slate-500">{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+            {section !== "overview" && <button onClick={() => setSection("overview")} className="-ml-2 inline-flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm font-bold text-slate-600 hover:bg-white hover:text-navy"><ArrowLeft size={16} /> Overview</button>}
+            <p className={`text-sm font-semibold text-slate-500 ${section !== "overview" ? "hidden sm:block" : ""}`}>{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
             <button onClick={reload} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-bold shadow-sm hover:border-royal">
               <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} /> Refresh
             </button>

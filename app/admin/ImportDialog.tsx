@@ -4,8 +4,9 @@ import { AlertTriangle, Check, CheckCircle2, Download, FileText, ListChecks, Loa
 import { useRef, useState, type DragEvent } from "react";
 import { TEMPLATE, convertType, validate, type ParsedQuestion, type QuestionType } from "@/lib/questionParser";
 import { useSubjects } from "@/app/components/useSubjects";
+import GradePills from "@/app/components/GradePills";
+import { gradesFor } from "@/lib/subjects";
 
-const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"];
 const ACCEPT = ".doc,.docx,.pdf,.txt";
 
 type Props = { defaultSubject?: string; lockSubject?: boolean; onClose: () => void; onPublished: (count: number) => void };
@@ -24,6 +25,8 @@ export default function ImportDialog({ defaultSubject, lockSubject = false, onCl
   const input = useRef<HTMLInputElement>(null);
 
   const ready = questions.filter((q) => !q.issues.length);
+  const grades = gradesFor(meta.subject, SUBJECTS);
+  const grade = grades.includes(meta.grade as (typeof grades)[number]) ? meta.grade : grades[grades.length - 1];
 
   async function read(file: File) {
     setError("");
@@ -63,7 +66,7 @@ export default function ImportDialog({ defaultSubject, lockSubject = false, onCl
     const response = await fetch("/api/questions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...meta, unit: meta.unit || "General", questions: ready.map((q) => ({ type: q.type, question: q.prompt, choices: q.choices, correctAnswer: q.correctAnswer, explanation: q.explanation })) }),
+      body: JSON.stringify({ ...meta, grade, unit: meta.unit || "General", questions: ready.map((q) => ({ type: q.type, question: q.prompt, choices: q.choices, correctAnswer: q.correctAnswer, explanation: q.explanation })) }),
     }).catch(() => null);
     const data = await response?.json().catch(() => ({}));
     setPublishing(false);
@@ -91,9 +94,9 @@ export default function ImportDialog({ defaultSubject, lockSubject = false, onCl
         </div>
 
         {/* Shared details for every question in the file */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-4">
+        <div className="mt-6"><GradePills value={grade} allowed={grades} subject={meta.subject} label="Which grade are these questions for?" onChange={(g) => setMeta({ ...meta, grade: g })} /></div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Select label="Subject" disabled={lockSubject} value={meta.subject} options={SUBJECTS.map((s) => s.name)} onChange={(v) => setMeta({ ...meta, subject: v })} />
-          <Select label="Grade" value={meta.grade} options={GRADES} onChange={(v) => setMeta({ ...meta, grade: v })} />
           <label className="text-xs font-bold text-slate-600">Unit<input value={meta.unit} onChange={(e) => setMeta({ ...meta, unit: e.target.value })} placeholder="e.g. Unit 2: Functions" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
           <label className="text-xs font-bold text-slate-600">Exam year<input value={meta.year} onChange={(e) => setMeta({ ...meta, year: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
         </div>

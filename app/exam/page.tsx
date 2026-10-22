@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, ChevronRight, Clock3, Flame, LayoutDashboard, Lock, MessageCircle, RotateCcw, Sparkles, Trophy, X, XCircle, Zap } from "lucide-react";
+import { CheckCircle2, ChevronRight, Clock3, Flame, LayoutDashboard, Lock, MessageCircle, RotateCcw, Sparkles, Trophy, X, XCircle, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import AccountMenu from "@/app/components/AccountMenu";
 import Brand from "@/app/components/Brand";
+import BackButton from "@/app/components/BackButton";
 import { useSubjects } from "@/app/components/useSubjects";
 import { xpFor } from "@/lib/gamification";
 import { secondsPerQuestion } from "@/lib/subjects";
@@ -124,7 +125,7 @@ function Exam() {
   return <main className="min-h-screen bg-[#f7f9fc] text-navy">
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-lg">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 py-3">
-        <div className="flex items-center gap-4"><Brand size="sm" /><Link href={saves ? "/student" : "/#grades"} className="hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-100 sm:inline-flex"><ArrowLeft size={16} /> {saves ? "Dashboard" : "Subjects"}</Link></div>
+        <div className="flex items-center gap-2 sm:gap-4"><BackButton href={saves ? "/student" : "/#grades"} label={saves ? "Dashboard" : "Subjects"} /><Brand size="sm" /></div>
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-extrabold text-violet-700"><Zap size={14} />{sessionXp} XP</span>
           {user ? <AccountMenu /> : <Link href="/login" className="rounded-xl bg-navy px-3.5 py-2 text-xs font-bold text-white hover:bg-royal">Sign in to save progress</Link>}

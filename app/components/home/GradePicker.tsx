@@ -26,6 +26,9 @@ const STYLE: Record<string, { icon: LucideIcon; tint: string; color: string }> =
   Economics: { icon: TrendingUp, tint: "from-indigo-500/15", color: "text-indigo-600 bg-indigo-50" },
 };
 
+/** Subjects added by the super admin get a neutral book icon. */
+const styleFor = (name: string) => STYLE[name] ?? { icon: BookOpenText, tint: "from-slate-500/15", color: "text-slate-600 bg-slate-100" };
+
 const STREAM_ICON: Record<Stream, LucideIcon> = { natural: Atom, social: BookOpenText };
 
 /** Opens on a signed-in student's own grade and stream; everyone else starts at Grade 12 · Natural. */
@@ -118,7 +121,7 @@ function Picker({ initialGrade, initialStream, personal }: { initialGrade: strin
       <motion.div layout className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="popLayout">
           {subjects.map((subject, index) => {
-            const { icon: Icon, tint, color } = STYLE[subject.name];
+            const { icon: Icon, tint, color } = styleFor(subject.name);
             return (
               <motion.div key={subject.name} layout initial={{ opacity: 0, scale: 0.92, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.3, delay: index * 0.04 }}>
                 <Link

@@ -1,13 +1,18 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Atom, BookOpenText, Clock3, Eye, EyeOff, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Atom, BookOpenText, Check, Clock3, Eye, EyeOff, GraduationCap, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { refreshSubjects } from "@/app/components/useSubjects";
-import type { Stream } from "@/lib/subjects";
+import { GRADES, gradeRange, needsStream, type Grade, type Stream } from "@/lib/subjects";
 
-type Row = { id: string; name: string; amharic: string; streams: Stream[]; minutes: number; hidden: boolean; questions: number; teachers: number };
-type Draft = { id?: string; name: string; amharic: string; streams: Stream[]; minutes: number };
-const EMPTY: Draft = { name: "", amharic: "", streams: ["natural", "social"], minutes: 1 };
+type Row = { id: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; minutes: number; hidden: boolean; questions: number; teachers: number };
+type Draft = { id?: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; minutes: number };
+const EMPTY: Draft = { name: "", amharic: "", streams: ["natural", "social"], grades: [...GRADES], minutes: 1 };
+const PRESETS: { label: string; grades: Grade[] }[] = [
+  { label: "All grades (9–12)", grades: [...GRADES] },
+  { label: "Grades 9–10", grades: ["Grade 9", "Grade 10"] },
+  { label: "Grades 11–12", grades: ["Grade 11", "Grade 12"] },
+];
 const MINUTES = [0.5, 1, 1.5, 2, 3, 4, 5];
 
 async function fetchRows(): Promise<{ rows?: Row[]; error?: string }> {
@@ -65,14 +70,15 @@ export default function SubjectsSection({ onToast }: { onToast: (ok: boolean, te
               {r.hidden ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">Hidden</span> : <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700">Active</span>}
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-bold">
-              {r.streams.length > 1 ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">Both streams</span> : r.streams.map((s) => (
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-violet-700"><GraduationCap size={11} />{gradeRange(r.grades)}</span>
+              {!r.grades.some(needsStream) ? null : r.streams.length > 1 ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">Both streams</span> : r.streams.map((s) => (
                 <span key={s} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{s === "natural" ? <Atom size={11} /> : <BookOpenText size={11} />}{s === "natural" ? "Natural Science" : "Social Science"}</span>
               ))}
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-royal"><Clock3 size={11} />{r.minutes} min / question</span>
             </div>
             <p className="mt-3 text-sm text-slate-500"><b className="text-navy">{r.questions}</b> question{r.questions === 1 ? "" : "s"} · <b className="text-navy">{r.teachers}</b> teacher{r.teachers === 1 ? "" : "s"}</p>
             <div className="mt-4 flex gap-1.5">
-              <button onClick={() => setDraft({ id: r.id, name: r.name, amharic: r.amharic, streams: r.streams, minutes: r.minutes })} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal"><Pencil size={13} /> Edit</button>
+              <button onClick={() => setDraft({ id: r.id, name: r.name, amharic: r.amharic, streams: r.streams, grades: r.grades, minutes: r.minutes })} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal"><Pencil size={13} /> Edit</button>
               <button disabled={busy === r.id} onClick={() => call("PATCH", r, { hidden: !r.hidden }, r.hidden ? `${r.name} is visible again.` : `${r.name} is hidden from students and new teachers.`)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal disabled:opacity-50">
                 {busy === r.id ? <LoaderCircle size={13} className="animate-spin" /> : r.hidden ? <Eye size={13} /> : <EyeOff size={13} />}{r.hidden ? "Show" : "Hide"}
               </button>
@@ -97,6 +103,10 @@ function SubjectDialog({ draft, onClose, onSaved }: { draft: Draft; onClose: () 
   const [error, setError] = useState("");
   const editing = Boolean(draft.id);
 
+  const senior = form.grades.some(needsStream);
+  function toggleGrade(g: Grade) {
+    setForm((f) => ({ ...f, grades: f.grades.includes(g) ? f.grades.filter((x) => x !== g) : GRADES.filter((x) => x === g || f.grades.includes(x)) }));
+  }
   function toggleStream(s: Stream) {
     setForm((f) => ({ ...f, streams: f.streams.includes(s) ? f.streams.filter((x) => x !== s) : [...f.streams, s] }));
   }
@@ -126,6 +136,27 @@ function SubjectDialog({ draft, onClose, onSaved }: { draft: Draft; onClose: () 
         <label className="mt-4 block text-sm font-semibold">Amharic name <span className="font-normal text-slate-400">(optional)</span>
           <input maxLength={60} value={form.amharic} onChange={(e) => setForm({ ...form, amharic: e.target.value })} placeholder="e.g. ኢንፎርሜሽን ቴክኖሎጂ" className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-amharic outline-none focus:border-royal" />
         </label>
+        <p className="mt-4 text-sm font-semibold">Grade levels</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {PRESETS.map((p) => {
+            const on = p.grades.length === form.grades.length && p.grades.every((g) => form.grades.includes(g));
+            return <button key={p.label} type="button" onClick={() => setForm({ ...form, grades: p.grades })} className={`rounded-full border px-3 py-1 text-xs font-bold ${on ? "border-royal bg-royal text-white" : "border-slate-200 text-slate-600 hover:border-royal"}`}>{p.label}</button>;
+          })}
+        </div>
+        <div className="mt-2 grid grid-cols-4 gap-2">
+          {GRADES.map((g) => {
+            const on = form.grades.includes(g);
+            return (
+              <button key={g} type="button" role="checkbox" aria-checked={on} onClick={() => toggleGrade(g)} className={`relative rounded-xl border-2 py-2 text-center ${on ? "border-royal bg-blue-50 text-royal" : "border-slate-200 text-slate-500"}`}>
+                {on && <Check size={12} className="absolute right-1.5 top-1.5" />}
+                <span className="block text-lg font-extrabold leading-5">{g.split(" ")[1]}</span><span className="text-[10px] font-bold uppercase tracking-wider">Grade</span>
+              </button>
+            );
+          })}
+        </div>
+        {!form.grades.length && <p className="mt-1.5 text-xs font-semibold text-red-600">Choose at least one grade.</p>}
+
+        {senior && <>
         <p className="mt-4 text-sm font-semibold">Stream (Grades 11–12)</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {(["natural", "social"] as const).map((s) => (
@@ -134,7 +165,8 @@ function SubjectDialog({ draft, onClose, onSaved }: { draft: Draft; onClose: () 
             </button>
           ))}
         </div>
-        <p className="mt-1.5 text-xs text-slate-500">Select both for a common subject. Grade 9–10 students see every subject.</p>
+        <p className="mt-1.5 text-xs text-slate-500">Select both for a common subject. Streams only apply in Grades 11–12.</p>
+        </>}
         <label className="mt-4 block text-sm font-semibold">Exam time per question
           <select value={form.minutes} onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })} className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5">
             {MINUTES.map((m) => <option key={m} value={m}>{m === 0.5 ? "30 seconds" : `${m} minute${m === 1 ? "" : "s"}`}</option>)}
@@ -143,7 +175,7 @@ function SubjectDialog({ draft, onClose, onSaved }: { draft: Draft; onClose: () 
         {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
         <div className="mt-6 grid grid-cols-2 gap-2">
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 py-3 text-sm font-bold hover:bg-slate-50">Cancel</button>
-          <button disabled={saving || !form.streams.length} className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy py-3 text-sm font-bold text-white hover:bg-royal disabled:opacity-50">
+          <button disabled={saving || !form.grades.length || (senior && !form.streams.length)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy py-3 text-sm font-bold text-white hover:bg-royal disabled:opacity-50">
             {saving && <LoaderCircle size={16} className="animate-spin" />}{editing ? "Save changes" : "Add subject"}
           </button>
         </div>

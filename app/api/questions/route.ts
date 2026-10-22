@@ -5,6 +5,7 @@ import { getSettings, hasFullAccess } from "@/lib/settings";
 import { getDb } from "@/lib/db";
 import type { DbQuestion } from "@/lib/types";
 import { findSubject } from "@/lib/subjectStore";
+import { gradeRange, gradesOf, type Grade } from "@/lib/subjects";
 
 export async function GET(request: Request) {
   try {
@@ -75,6 +76,11 @@ export async function POST(request: Request) {
       if (auth.user.role === "admin") {
         if (!auth.user.subject) return Response.json({ error: "Your account has no subject yet. Ask the platform administrator to assign one." }, { status: 409 });
         result.subject = auth.user.subject;
+      }
+      // The grade must be one of Grades 9–12 that this subject is taught in.
+      const allowed = gradesOf(await findSubject(result.subject, { includeHidden: true }));
+      if (!allowed.includes(result.grade as Grade)) {
+        return Response.json({ error: `${result.subject} is offered for ${gradeRange(allowed)} — choose one of those grades`, index }, { status: 400 });
       }
       docs.push(result);
     }
