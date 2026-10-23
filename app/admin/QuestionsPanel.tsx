@@ -1,11 +1,14 @@
 "use client";
-import { Eye, EyeOff, ListChecks, LoaderCircle, Search, ToggleLeft, Trash2 } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { Eye, EyeOff, ListChecks, LoaderCircle, Pencil, Search, ToggleLeft, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { GRADES } from "@/lib/subjects";
+import EditQuestionDialog from "./EditQuestionDialog";
 import { ago, pct } from "./ResultsPanel";
 
 export type QuestionRow = {
   id: string; prompt: string; type: "mcq" | "truefalse"; grade: string; unit: string; year: string;
+  choices: string[]; correctAnswer: number; explanation: string;
   published: boolean; teacher: string; mine: boolean; createdAt: string; answers: number; correct: number;
 };
 
@@ -17,6 +20,7 @@ export default function QuestionsPanel({ subject, rows, canManageAll, onChanged,
   const [grade, setGrade] = useState("");
   const [scope, setScope] = useState<"mine" | "all">("mine");
   const [busy, setBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<QuestionRow | null>(null);
 
   const list = useMemo(() => (rows ?? []).filter((q) => (scope === "all" || q.mine) && (!grade || q.grade === grade) && (q.prompt + q.unit).toLowerCase().includes(query.toLowerCase())), [rows, scope, grade, query]);
 
@@ -81,6 +85,7 @@ export default function QuestionsPanel({ subject, rows, canManageAll, onChanged,
                 )}
                 {manageable && (
                   <div className="flex shrink-0 gap-1.5">
+                    <button disabled={busy === q.id} onClick={() => setEditing(q)} title="Edit question" className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-bold text-slate-600 hover:border-royal hover:text-royal disabled:opacity-50"><Pencil size={14} /> Edit</button>
                     <button disabled={busy === q.id} onClick={() => toggle(q)} title={q.published ? "Hide from students" : "Publish to students"} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:border-royal hover:text-royal disabled:opacity-50">
                       {busy === q.id ? <LoaderCircle size={15} className="animate-spin" /> : q.published ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
@@ -97,6 +102,9 @@ export default function QuestionsPanel({ subject, rows, canManageAll, onChanged,
           {rows.length ? "No questions match these filters." : <>No {subject} questions yet. <button onClick={onAdd} className="font-bold text-royal hover:underline">Add the first one</button></>}
         </div>
       )}
+      <AnimatePresence>
+        {editing && <EditQuestionDialog question={editing} subject={subject} onClose={() => setEditing(null)} onSaved={(text) => { setEditing(null); onChanged(text, true); }} />}
+      </AnimatePresence>
     </section>
   );
 }

@@ -27,12 +27,24 @@ export async function GET(request: Request) {
     ]);
     // With payment on, free students and visitors get only the free questions and no explanations.
     const full = hasFullAccess(user, settings);
-    const questions = full ? all : all.slice(0, settings.freeQuestions);
+    // Every student gets their own order (stable for them, so reloading doesn't reveal more free questions).
+    const ordered = user?.role === "student" ? shuffled(all, `${user.id}|${grade}|${subject}`) : all;
+    const questions = full ? ordered : ordered.slice(0, settings.freeQuestions);
     return Response.json({
       limited: !full, total: all.length, freeQuestions: settings.freeQuestions, paymentRequired: settings.paymentRequired,
       questions: questions.map((q) => ({ id: q._id?.toString(), subject: q.subject, grade: q.grade, unit: q.unit, year: q.year, type: q.type ?? "mcq", question: q.prompt, choices: q.choices, answer: q.correctAnswer, explanation: full ? q.explanation : "", teacher: q.teacherName })),
     });
   } catch (error) { return apiError(error); }
+}
+
+/** Deterministic Fisher–Yates shuffle: the same seed always gives the same order. */
+function shuffled<T>(items: T[], seed: string): T[] {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  const random = () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
 }
 
 type Defaults = { subject: string; grade: string; unit: string; year: string };
@@ -89,18 +101,41 @@ export async function POST(request: Request) {
   } catch (error) { return apiError(error); }
 }
 
-/** Hide/publish a question. Teachers: their own questions only; super admin: any. */
+/**
+ * Edit a question ({ id, question, choices, correctAnswer, ... }) or hide/publish it ({ id, published }).
+ * Teachers: their own questions only; super admin: any.
+ */
 export async function PATCH(request: Request) {
   try {
     const auth = await requireUser(["admin", "super-admin"]); if (auth.error) return auth.error;
     const body = await readJson(request);
     const id = cleanString(body.id, 40);
-    if (!ObjectId.isValid(id) || typeof body.published !== "boolean") return Response.json({ error: "Invalid update" }, { status: 400 });
+    if (!ObjectId.isValid(id)) return Response.json({ error: "Invalid update" }, { status: 400 });
     const filter = { _id: new ObjectId(id), ...(auth.user.role === "admin" ? { createdBy: new ObjectId(auth.user.id) } : {}) };
+    if (body.question !== undefined) return editQuestion(filter, body, auth.user);
+    if (typeof body.published !== "boolean") return Response.json({ error: "Invalid update" }, { status: 400 });
     const result = await (await getDb()).collection("questions").updateOne(filter, { $set: { published: body.published, updatedAt: new Date() } });
     if (!result.matchedCount) return Response.json({ error: "You can only change your own questions" }, { status: 403 });
     return Response.json({ ok: true });
   } catch (error) { return apiError(error); }
+}
+
+/** Saves an edited question. Subject, author and publish state stay as they are. */
+async function editQuestion(filter: { _id: ObjectId }, body: Record<string, unknown>, user: { id: string; name: string }) {
+  const db = await getDb();
+  const current = await db.collection<DbQuestion>("questions").findOne(filter);
+  if (!current) return Response.json({ error: "You can only edit your own questions" }, { status: 403 });
+  const next = toQuestion({ ...body, subject: current.subject }, { subject: current.subject, grade: current.grade, unit: current.unit, year: current.year }, user);
+  if (typeof next === "string") return Response.json({ error: next }, { status: 400 });
+  const allowed = gradesOf(await findSubject(current.subject, { includeHidden: true }));
+  if (!allowed.includes(next.grade as Grade)) return Response.json({ error: `${current.subject} is offered for ${gradeRange(allowed)} — choose one of those grades` }, { status: 400 });
+  const changes = { type: next.type, prompt: next.prompt, choices: next.choices, correctAnswer: next.correctAnswer, explanation: next.explanation, grade: next.grade, unit: next.unit, year: next.year, updatedAt: new Date() };
+  await db.collection<DbQuestion>("questions").updateOne({ _id: current._id }, { $set: changes });
+  // If the correct answer changed, re-mark students' earlier answers so their scores stay right.
+  if (next.correctAnswer !== current.correctAnswer || next.type !== (current.type ?? "mcq")) {
+    await db.collection("attempts").updateMany({ questionId: current._id, timedOut: { $ne: true } }, [{ $set: { correct: { $eq: ["$selectedAnswer", next.correctAnswer] } } }]);
+  }
+  return Response.json({ ok: true });
 }
 
 /** Delete a question (and its practice answers). Teachers: their own only; super admin: any. */

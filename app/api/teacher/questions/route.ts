@@ -22,6 +22,7 @@ export async function GET(request: Request) {
       subject: scope.subject,
       questions: questions.map((q) => ({
         id: q._id!.toString(), prompt: q.prompt, type: q.type ?? "mcq", grade: q.grade, unit: q.unit, year: q.year,
+        choices: q.choices, correctAnswer: q.correctAnswer, explanation: q.explanation ?? "",
         published: q.published !== false, teacher: q.teacherName, mine: q.createdBy?.toString() === auth.user.id, createdAt: q.createdAt,
         answers: byId.get(q._id!.toString())?.total ?? 0, correct: byId.get(q._id!.toString())?.correct ?? 0,
       })),

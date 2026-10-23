@@ -1,10 +1,11 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, Check, CheckCircle2, Download, FileText, ListChecks, LoaderCircle, ToggleLeft, Trash2, UploadCloud, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileText, ListChecks, LoaderCircle, ToggleLeft, Trash2, UploadCloud, X } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { TEMPLATE, convertType, validate, type ParsedQuestion, type QuestionType } from "@/lib/questionParser";
 import { useSubjects } from "@/app/components/useSubjects";
 import GradePills from "@/app/components/GradePills";
+import ChoiceEditor from "./ChoiceEditor";
 import { gradesFor } from "@/lib/subjects";
 
 const ACCEPT = ".doc,.docx,.pdf,.txt";
@@ -178,25 +179,9 @@ export default function ImportDialog({ defaultSubject, lockSubject = false, onCl
                         </button>
                       ))}
                     </div>
-                    {q.type === "truefalse" ? (
-                      <div className="mt-2 grid grid-cols-2 gap-2 pl-8">
-                        {["True", "False"].map((label, c) => (
-                          <button key={label} type="button" onClick={() => update(i, { correctAnswer: c })} className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2 text-sm font-extrabold ${q.correctAnswer === c ? (c === 0 ? "border-green-500 bg-green-50 text-green-700" : "border-red-400 bg-red-50 text-red-600") : "border-slate-200 bg-white text-slate-400"}`}>
-                            {c === 0 ? <Check size={15} /> : <X size={15} />}{label}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-2 grid gap-2 pl-8 sm:grid-cols-2">
-                        {q.choices.map((choice, c) => (
-                          <label key={c} className={`flex items-center gap-2 rounded-xl border bg-white px-2.5 py-1.5 text-sm ${q.correctAnswer === c ? "border-green-400 ring-2 ring-green-100" : "border-slate-200"}`}>
-                            <input type="radio" name={`answer-${i}`} checked={q.correctAnswer === c} onChange={() => update(i, { correctAnswer: c })} className="accent-green-600" aria-label={`Mark choice ${String.fromCharCode(65 + c)} correct`} />
-                            <span className="text-xs font-bold text-slate-400">{String.fromCharCode(65 + c)}</span>
-                            <input value={choice} onChange={(e) => update(i, { choices: q.choices.map((v, k) => (k === c ? e.target.value : v)) })} className="min-w-0 flex-1 outline-none" />
-                          </label>
-                        ))}
-                      </div>
-                    )}
+                    <div className="mt-2 pl-8">
+                      <ChoiceEditor compact type={q.type} name={`q${i}`} choices={q.choices} correctAnswer={q.correctAnswer} onChange={(next) => update(i, next)} />
+                    </div>
                     <div className="mt-2 pl-8">
                       <input value={q.explanation} onChange={(e) => update(i, { explanation: e.target.value })} placeholder="Explanation (optional)" className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-sm" />
                       {q.issues.length > 0 && <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-amber-700"><AlertTriangle size={13} />{q.issues.join(" · ")}</p>}
