@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Atom, BookOpenText, Brain, Calculator, Dna, FlaskConical, Globe2, Languages, Landmark, TrendingUp, type LucideIcon } from "lucide-react";
+import { ArrowRight, Lock, Atom, BookOpenText, Brain, Calculator, Dna, FlaskConical, Globe2, Languages, Landmark, TrendingUp, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useSession } from "@/app/components/useSession";
@@ -33,12 +33,12 @@ const STREAM_ICON: Record<Stream, LucideIcon> = { natural: Atom, social: BookOpe
 
 /** Opens on a signed-in student's own grade and stream; everyone else starts at Grade 12 · Natural. */
 export default function GradePicker() {
-  const { user } = useSession();
+  const { user, loading } = useSession();
   const mine = user?.role === "student" && user.grade ? user : null;
-  return <Picker key={mine ? `${mine.grade}-${mine.stream}` : "default"} initialGrade={mine?.grade ?? "Grade 12"} initialStream={mine?.stream ?? "natural"} personal={!!mine} />;
+  return <Picker key={mine ? `${mine.grade}-${mine.stream}` : "default"} initialGrade={mine?.grade ?? "Grade 12"} initialStream={mine?.stream ?? "natural"} personal={!!mine} signedIn={loading || !!user} />;
 }
 
-function Picker({ initialGrade, initialStream, personal }: { initialGrade: string; initialStream: Stream; personal: boolean }) {
+function Picker({ initialGrade, initialStream, personal, signedIn: user }: { initialGrade: string; initialStream: Stream; personal: boolean; signedIn: boolean }) {
   const [grade, setGrade] = useState(initialGrade);
   const [stream, setStream] = useState<Stream>(initialStream);
   const withStream = needsStream(grade);
@@ -113,7 +113,7 @@ function Picker({ initialGrade, initialStream, personal }: { initialGrade: strin
               <span className="font-amharic text-slate-500">({STREAMS.find((s) => s.id === stream)?.amharic})</span>
             </>
           ) : <span className="font-extrabold">All subjects</span>}
-          — pick a subject to start your practice exam.
+          — {user ? "pick a subject to start your practice exam." : "sign in or create a free student account, then pick a subject."}
         </motion.p>
       </AnimatePresence>
 
@@ -122,10 +122,12 @@ function Picker({ initialGrade, initialStream, personal }: { initialGrade: strin
         <AnimatePresence mode="popLayout">
           {subjects.map((subject, index) => {
             const { icon: Icon, tint, color } = styleFor(subject.name);
+            const examHref = (name: string) => `/exam?grade=${encodeURIComponent(grade)}&subject=${encodeURIComponent(name)}`;
             return (
               <motion.div key={subject.name} layout initial={{ opacity: 0, scale: 0.92, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.3, delay: index * 0.04 }}>
                 <Link
-                  href={`/exam?grade=${encodeURIComponent(grade)}&subject=${encodeURIComponent(subject.name)}`}
+                  href={user ? examHref(subject.name) : `/login?next=${encodeURIComponent(examHref(subject.name))}`}
+                  title={user ? undefined : "Sign in to practise"}
                   className="card-lift group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5"
                 >
                   <span className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${tint} to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100`} />
@@ -138,7 +140,7 @@ function Picker({ initialGrade, initialStream, personal }: { initialGrade: strin
                     <span className="block font-amharic text-sm text-slate-500">{subject.amharic}</span>
                   </span>
                   <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-navy transition-all duration-300 group-hover:bg-navy group-hover:text-white">
-                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+                    {user ? <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" /> : <Lock size={15} />}
                   </span>
                 </Link>
               </motion.div>

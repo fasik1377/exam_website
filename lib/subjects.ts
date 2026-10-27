@@ -9,6 +9,8 @@ export type Subject = {
   grades?: Grade[];
   /** Exam time allowed per question, in minutes. */
   minutes?: number;
+  /** Show the scientific calculator during practice. */
+  calculator?: boolean;
   /** Hidden subjects stay in the database but are not offered to students or new teachers. */
   hidden?: boolean;
 };
@@ -40,6 +42,11 @@ export const subjectsFor = (stream: Stream, list: Subject[] = SUBJECTS) => list.
 export const secondsPerQuestion = (subject: string, list: Subject[] = SUBJECTS) =>
   Math.round((list.find((s) => s.name === subject)?.minutes ?? (subject === "Mathematics" ? 3 : 1)) * 60);
 export const isCommon = (subject: Subject) => subject.streams.length > 1;
+
+/** Subjects that get the calculator unless the super admin says otherwise. */
+const CALCULATOR_DEFAULT = ["Mathematics", "Physics", "Chemistry", "Biology", "Economics", "Scholastic Aptitude"];
+export const hasCalculator = (subject?: Pick<Subject, "name" | "calculator"> | null) =>
+  !!subject && (subject.calculator ?? CALCULATOR_DEFAULT.includes(subject.name));
 
 export const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"] as const;
 export type Grade = (typeof GRADES)[number];

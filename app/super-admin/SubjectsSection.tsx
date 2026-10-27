@@ -1,13 +1,13 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Atom, BookOpenText, Check, Clock3, Eye, EyeOff, GraduationCap, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Atom, BookOpenText, Calculator, Check, Clock3, Eye, EyeOff, GraduationCap, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { refreshSubjects } from "@/app/components/useSubjects";
 import { GRADES, gradeRange, needsStream, type Grade, type Stream } from "@/lib/subjects";
 
-type Row = { id: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; minutes: number; hidden: boolean; questions: number; teachers: number };
-type Draft = { id?: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; minutes: number };
-const EMPTY: Draft = { name: "", amharic: "", streams: ["natural", "social"], grades: [...GRADES], minutes: 1 };
+type Row = { id: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; calculator: boolean; minutes: number; hidden: boolean; questions: number; teachers: number };
+type Draft = { id?: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; calculator: boolean; minutes: number };
+const EMPTY: Draft = { name: "", amharic: "", streams: ["natural", "social"], grades: [...GRADES], calculator: false, minutes: 1 };
 const PRESETS: { label: string; grades: Grade[] }[] = [
   { label: "All grades (9–12)", grades: [...GRADES] },
   { label: "Grades 9–10", grades: ["Grade 9", "Grade 10"] },
@@ -75,10 +75,11 @@ export default function SubjectsSection({ onToast }: { onToast: (ok: boolean, te
                 <span key={s} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{s === "natural" ? <Atom size={11} /> : <BookOpenText size={11} />}{s === "natural" ? "Natural Science" : "Social Science"}</span>
               ))}
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-royal"><Clock3 size={11} />{r.minutes} min / question</span>
+              {r.calculator && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700"><Calculator size={11} />Calculator</span>}
             </div>
             <p className="mt-3 text-sm text-slate-500"><b className="text-navy">{r.questions}</b> question{r.questions === 1 ? "" : "s"} · <b className="text-navy">{r.teachers}</b> teacher{r.teachers === 1 ? "" : "s"}</p>
             <div className="mt-4 flex gap-1.5">
-              <button onClick={() => setDraft({ id: r.id, name: r.name, amharic: r.amharic, streams: r.streams, grades: r.grades, minutes: r.minutes })} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal"><Pencil size={13} /> Edit</button>
+              <button onClick={() => setDraft({ id: r.id, name: r.name, amharic: r.amharic, streams: r.streams, grades: r.grades, calculator: r.calculator, minutes: r.minutes })} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal"><Pencil size={13} /> Edit</button>
               <button disabled={busy === r.id} onClick={() => call("PATCH", r, { hidden: !r.hidden }, r.hidden ? `${r.name} is visible again.` : `${r.name} is hidden from students and new teachers.`)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal disabled:opacity-50">
                 {busy === r.id ? <LoaderCircle size={13} className="animate-spin" /> : r.hidden ? <Eye size={13} /> : <EyeOff size={13} />}{r.hidden ? "Show" : "Hide"}
               </button>
@@ -171,6 +172,10 @@ function SubjectDialog({ draft, onClose, onSaved }: { draft: Draft; onClose: () 
           <select value={form.minutes} onChange={(e) => setForm({ ...form, minutes: Number(e.target.value) })} className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5">
             {MINUTES.map((m) => <option key={m} value={m}>{m === 0.5 ? "30 seconds" : `${m} minute${m === 1 ? "" : "s"}`}</option>)}
           </select>
+        </label>
+        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3.5 hover:border-royal">
+          <input type="checkbox" checked={form.calculator} onChange={(e) => setForm({ ...form, calculator: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[#155EEF]" />
+          <span><span className="flex items-center gap-1.5 text-sm font-bold"><Calculator size={15} /> Scientific calculator</span><span className="text-xs text-slate-500">Students can open a calculator (powers, log, trig in degrees/radians, π, science constants) while practising.</span></span>
         </label>
         {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
         <div className="mt-6 grid grid-cols-2 gap-2">

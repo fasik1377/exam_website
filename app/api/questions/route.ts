@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { apiError, cleanString, readJson } from "@/lib/api";
-import { ensureDatabase, getCurrentUser, requireUser } from "@/lib/auth";
+import { ensureDatabase, requireUser } from "@/lib/auth";
 import { getSettings, hasFullAccess } from "@/lib/settings";
 import { getDb } from "@/lib/db";
 import type { DbQuestion } from "@/lib/types";
@@ -10,6 +10,8 @@ import { gradeRange, gradesOf, type Grade } from "@/lib/subjects";
 export async function GET(request: Request) {
   try {
     await ensureDatabase();
+    // Questions are only for signed-in accounts (students practise, teachers preview).
+    const auth = await requireUser(); if (auth.error) return auth.error;
     const url = new URL(request.url);
     const filter: Record<string, unknown> = { published: true };
     const grade = cleanString(url.searchParams.get("grade"), 30);
@@ -22,7 +24,7 @@ export async function GET(request: Request) {
     if (year) filter.year = year;
     const [all, user, settings] = await Promise.all([
       (await getDb()).collection<DbQuestion>("questions").find(filter).sort({ createdAt: 1 }).limit(100).toArray(),
-      getCurrentUser(),
+      Promise.resolve(auth.user),
       getSettings(),
     ]);
     // With payment on, free students and visitors get only the free questions and no explanations.

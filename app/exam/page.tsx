@@ -8,7 +8,8 @@ import Brand from "@/app/components/Brand";
 import BackButton from "@/app/components/BackButton";
 import { useSubjects } from "@/app/components/useSubjects";
 import { xpFor } from "@/lib/gamification";
-import { secondsPerQuestion } from "@/lib/subjects";
+import { hasCalculator, secondsPerQuestion } from "@/lib/subjects";
+import Calculator from "./Calculator";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
@@ -33,7 +34,9 @@ function Exam() {
   const params = useSearchParams();
   const grade = params.get("grade") || "Grade 12";
   const subject = params.get("subject") || "Mathematics";
-  const duration = secondsPerQuestion(subject, useSubjects());
+  const subjectList = useSubjects();
+  const duration = secondsPerQuestion(subject, subjectList);
+  const calculator = hasCalculator(subjectList.find((s) => s.name === subject));
   const [questions, setQuestions] = useState<Question[]>([]);
   const [access, setAccess] = useState<Access>({ limited: false, total: 0, freeQuestions: 0 });
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -118,6 +121,8 @@ function Exam() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!mode || !question || finished || locked || showSubscribe || e.metaKey || e.ctrlKey || e.altKey) return;
+      // Typing in the calculator (or any field) must not answer the question.
+      if (e.target instanceof HTMLElement && (e.target.closest("input, textarea, select") || e.target.closest("#calculator-panel"))) return;
       const k = e.key.toLowerCase();
       const pick = "abcd".indexOf(k) >= 0 ? "abcd".indexOf(k) : "1234".indexOf(k);
       if (pick >= 0 && pick < question.choices.length && !result) { e.preventDefault(); answer(pick); }
@@ -147,7 +152,7 @@ function Exam() {
       </div>
     </header>
 
-    <div className="mx-auto max-w-5xl px-5 py-8">
+    <div className={`mx-auto max-w-5xl px-5 py-8 ${calculator ? "pb-24" : ""}`}>
       {!mode && questions.length > 0 ? <ModePicker subject={subject} grade={grade} total={total} available={questions.length} seconds={duration} onStart={start} /> :
       finished ? <Summary subject={subject} grade={grade} questions={questions} results={results} total={questions.length} saves={saves} mode={mode ?? "practice"} explanations={!requiresSubscription} onRestart={restart} onSubscribe={() => setShowSubscribe(true)} /> :
       <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
@@ -213,6 +218,7 @@ function Exam() {
         <XpPop result={reveal ? result : undefined} key={`${index}-${result ? "done" : "open"}`} />
       </motion.section>}
     </div>
+    {mode && !finished && calculator && <Calculator />}
     {showSubscribe && <SubscriptionDialog onClose={() => setShowSubscribe(false)} />}
   </main>;
 }
