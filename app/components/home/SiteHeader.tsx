@@ -6,6 +6,7 @@ import { useState } from "react";
 import Brand from "@/app/components/Brand";
 import LogoutButton from "@/app/components/LogoutButton";
 import AccountMenu from "@/app/components/AccountMenu";
+import ThemeToggle from "@/app/components/ThemeToggle";
 import { dashboardFor, useSession } from "@/app/components/useSession";
 
 const LINKS = [
@@ -50,7 +51,7 @@ export default function SiteHeader() {
                 <span className="hidden lg:inline">{dashboardLabel}</span>
                 <LayoutDashboard size={16} className="lg:hidden" />
               </Link>
-              <AccountMenu tone={light ? "dark" : "light"} />
+              <AccountMenu tone={light ? "dark" : "light"} themeToggle={false} />
             </>
           ) : (
             <>
@@ -60,6 +61,7 @@ export default function SiteHeader() {
           )}
         </div>
 
+        <ThemeToggle tone={light ? "dark" : "light"} className="ml-2 md:ml-0 md:order-none" />
         <button onClick={() => setOpen(!open)} className={`rounded-lg p-2 md:hidden ${light ? "text-navy" : "text-white"}`} aria-label="Toggle navigation" aria-expanded={open}>
           {open ? <X /> : <Menu />}
         </button>

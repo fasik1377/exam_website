@@ -8,6 +8,8 @@ import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
 import { useSubjects } from "@/app/components/useSubjects";
 import GradePills from "@/app/components/GradePills";
+import CodeTextarea from "@/app/components/CodeTextarea";
+import { ChoiceInput } from "./ChoiceEditor";
 import BackButton from "@/app/components/BackButton";
 import { gradesFor } from "@/lib/subjects";
 import ImportDialog from "./ImportDialog";
@@ -230,7 +232,7 @@ export default function TeacherDashboard() {
                   </button>
                 ))}
               </div>
-              <label className="mt-4 block text-sm font-bold">{form.type === "truefalse" ? "Statement" : "Question"}<textarea required value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} placeholder={form.type === "truefalse" ? "e.g. Lake Tana is the source of the Blue Nile." : "e.g. What is the value of x if 3x + 6 = 21?"} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+              <CodeTextarea className="mt-4" required label={form.type === "truefalse" ? "Statement" : "Question"} rows={4} value={form.question} onChange={(question) => setForm({ ...form, question })} placeholder={form.type === "truefalse" ? "e.g. Lake Tana is the source of the Blue Nile." : "e.g. What is the value of x if 3x + 6 = 21?  (Use Code block for programming questions)"} />
               {form.type === "truefalse" ? (
                 <div className="mt-4">
                   <p className="text-sm font-bold">Correct answer</p>
@@ -252,7 +254,7 @@ export default function TeacherDashboard() {
                           <button type="button" onClick={() => setForm({ ...form, correctAnswer: i })} aria-label={`Mark choice ${String.fromCharCode(65 + i)} correct`} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-extrabold ${form.correctAnswer === i ? "bg-green-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
                             {form.correctAnswer === i ? <Check size={16} /> : String.fromCharCode(65 + i)}
                           </button>
-                          <input required value={choice} onChange={(e) => setChoice(i, e.target.value)} placeholder={`Choice ${String.fromCharCode(65 + i)}`} className="min-w-0 flex-1 bg-transparent px-1 py-1.5 outline-none" />
+                          <ChoiceInput required value={choice} onChange={(v) => setChoice(i, v)} placeholder={`Choice ${String.fromCharCode(65 + i)}`} label={`Choice ${String.fromCharCode(65 + i)}`} className="px-1 py-1.5" />
                           {form.choices.length > 2 && <button type="button" onClick={() => removeChoice(i)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove choice"><Trash2 size={15} /></button>}
                         </motion.div>
                       ))}
@@ -261,7 +263,7 @@ export default function TeacherDashboard() {
                   {form.choices.length < 6 && <button type="button" onClick={() => setForm({ ...form, choices: [...form.choices, ""] })} className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold text-royal hover:bg-blue-50"><Plus size={14} /> Add choice</button>}
                 </div>
               )}
-              <label className="mt-4 block text-sm font-bold">Explanation <span className="font-normal text-slate-400">(optional)</span><textarea value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
+              <CodeTextarea className="mt-4" label="Explanation (optional)" rows={3} value={form.explanation} onChange={(explanation) => setForm({ ...form, explanation })} />
               {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
               <div className="mt-6 grid gap-2 sm:grid-cols-2">
                 <button type="submit" name="another" value="1" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3.5 font-bold hover:border-royal disabled:opacity-70">

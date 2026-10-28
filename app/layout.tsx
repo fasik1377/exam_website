@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Ethiopic, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import "./theme-dark.css";
+import { THEME_SCRIPT } from "@/lib/theme";
 import MotionProvider from "@/app/components/MotionProvider";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -31,7 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${jakarta.variable} ${ethiopic.variable} h-full antialiased`}>
+    <html lang="en" className={`${jakarta.variable} ${ethiopic.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        {/* Sets light/dark before the first paint, so the page never flashes the wrong theme. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col"><MotionProvider>{children}</MotionProvider></body>
     </html>
   );

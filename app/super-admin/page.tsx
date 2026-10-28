@@ -15,6 +15,7 @@ import { useSubjects } from "@/app/components/useSubjects";
 import PaymentsSection from "./PaymentsSection";
 import SubjectsSection from "./SubjectsSection";
 import { AccuracyBars, DailyStacked, Heatmap, Meter, SERIES, STATUS, Sparkline, StackedBar, SubjectBars, TrendChart } from "./charts";
+import { plainSummary } from "@/lib/highlight";
 
 type Status = "pending" | "active" | "restricted" | "banned" | "rejected";
 type Account = { id: string; name: string; email: string; role: string; plan: string; status: Status; subject: string | null; createdAt: string; owner?: boolean; grade?: string | null; stream?: "natural" | "social" | null };
@@ -454,7 +455,7 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo,
           <ul className="grid gap-3">
             {overview?.recentQuestions.length ? overview.recentQuestions.slice(0, 3).map((q) => (
               <li key={q.id} className="rounded-xl border border-slate-100 p-3">
-                <p className="line-clamp-2 text-sm font-semibold">{q.prompt}</p>
+                <p className="line-clamp-2 text-sm font-semibold">{plainSummary(q.prompt)}</p>
                 <p className="mt-1 text-xs text-slate-500">{q.subject} · {q.teacher} · {timeAgo(q.createdAt)}</p>
               </li>
             )) : <li className="text-sm text-slate-500">No questions yet.</li>}

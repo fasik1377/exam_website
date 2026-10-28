@@ -54,13 +54,13 @@ type Defaults = { subject: string; grade: string; unit: string; year: string };
 /** Validates one incoming question; returns an error message or the document to insert. */
 function toQuestion(input: Record<string, unknown>, defaults: Defaults, teacher: { id: string; name: string }): Omit<DbQuestion, "_id"> | string {
   const type = input.type === "truefalse" ? "truefalse" : "mcq";
-  const choices = type === "truefalse" ? ["True", "False"] : Array.isArray(input.choices) ? input.choices.map((item: unknown) => cleanString(item, 250)) : [];
+  const choices = type === "truefalse" ? ["True", "False"] : Array.isArray(input.choices) ? input.choices.map((item: unknown) => cleanString(item, 1500)) : [];
   const correctAnswer = Number(input.correctAnswer);
   const now = new Date();
   const question: Omit<DbQuestion, "_id"> = {
     subject: cleanString(input.subject, 60) || defaults.subject, grade: cleanString(input.grade, 30) || defaults.grade,
     unit: cleanString(input.unit, 60) || defaults.unit, year: cleanString(input.year, 30) || defaults.year || "2016 E.C.",
-    type, prompt: cleanString(input.question ?? input.prompt, 1000), choices, correctAnswer, explanation: cleanString(input.explanation, 1500),
+    type, prompt: cleanString(input.question ?? input.prompt, 6000), choices, correctAnswer, explanation: cleanString(input.explanation, 6000),
     teacherName: teacher.name, createdBy: new ObjectId(teacher.id), published: input.published !== false, createdAt: now, updatedAt: now,
   };
   if (!question.subject || !question.grade) return "Choose a subject and grade";

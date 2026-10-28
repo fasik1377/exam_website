@@ -8,6 +8,7 @@ import AccountMenu from "@/app/components/AccountMenu";
 import { useSubjects } from "@/app/components/useSubjects";
 import { GRADES, STREAMS, needsStream, secondsPerQuestion, streamLabel, subjectsForStudent, type Stream } from "@/lib/subjects";
 import { Badges, Leaderboard, LevelCard, WeekActivity, type Badge, type Level } from "./Engagement";
+import { plainSummary } from "@/lib/highlight";
 
 type Summary = {
   user: { name: string; plan: string; grade?: string | null; stream?: Stream | null };
@@ -204,7 +205,7 @@ export default function StudentDashboard() {
                 {data.recent.map((r, i) => (
                   <li key={i} className="flex items-start gap-3 rounded-xl border border-slate-100 p-3">
                     {r.correct ? <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-green-600" /> : r.timedOut ? <Clock3 size={18} className="mt-0.5 shrink-0 text-amber-500" /> : <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />}
-                    <span className="min-w-0"><span className="line-clamp-1 text-sm font-semibold">{r.prompt}</span><span className="text-xs text-slate-500">{r.subject}{r.timedOut ? " · time ran out" : ""}</span></span>
+                    <span className="min-w-0"><span className="line-clamp-1 text-sm font-semibold">{plainSummary(r.prompt)}</span><span className="text-xs text-slate-500">{r.subject}{r.timedOut ? " · time ran out" : ""}</span></span>
                   </li>
                 ))}
               </ul>

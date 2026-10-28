@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Lock, Atom, BookOpenText, Brain, Calculator, Dna, FlaskConical, Globe2, Languages, Landmark, TrendingUp, type LucideIcon } from "lucide-react";
+import { ArrowRight, Code2, Lock, Atom, BookOpenText, Brain, Calculator, Dna, FlaskConical, Globe2, Languages, Landmark, TrendingUp, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useSession } from "@/app/components/useSession";
@@ -27,7 +27,9 @@ const STYLE: Record<string, { icon: LucideIcon; tint: string; color: string }> =
 };
 
 /** Subjects added by the super admin get a neutral book icon. */
-const styleFor = (name: string) => STYLE[name] ?? { icon: BookOpenText, tint: "from-slate-500/15", color: "text-slate-600 bg-slate-100" };
+const CODE_STYLE = { icon: Code2, tint: "from-cyan-500/15", color: "text-cyan-700 bg-cyan-50" };
+const styleFor = (name: string) =>
+  STYLE[name] ?? (/web|program|coding|computer|software|ict|it|information tech/i.test(name) ? CODE_STYLE : { icon: BookOpenText, tint: "from-slate-500/15", color: "text-slate-600 bg-slate-100" });
 
 const STREAM_ICON: Record<Stream, LucideIcon> = { natural: Atom, social: BookOpenText };
 

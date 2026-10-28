@@ -10,6 +10,7 @@ import { useSubjects } from "@/app/components/useSubjects";
 import { xpFor } from "@/lib/gamification";
 import { hasCalculator, secondsPerQuestion } from "@/lib/subjects";
 import Calculator from "./Calculator";
+import RichText from "@/app/components/RichText";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
@@ -183,13 +184,13 @@ function Exam() {
         {locked ? <div className="mt-10 rounded-2xl border border-slate-200 bg-[#f7f9fc] p-8 text-center"><Lock className="mx-auto" /><h2 className="mt-4 text-xl font-bold">{access.freeQuestions ? "Free preview complete" : "Subscription required"}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{access.freeQuestions ? `You've used the ${access.freeQuestions} free questions in ${subject}. ` : ""}Subscribe to unlock all {total} questions, every explanation and teacher support.</p><div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row"><button onClick={() => setShowSubscribe(true)} className="rounded-lg bg-navy px-4 py-3 text-sm font-bold text-white">Subscribe monthly or yearly</button>{answered > 0 && <button onClick={() => setFinished(true)} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">See my results</button>}{!user && <Link href="/signup" className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">Create student account</Link>}</div></div> : <>
           <AnimatePresence mode="wait"><motion.div key={question.id} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
             {question.type === "truefalse" && <p className="mt-8 inline-flex rounded-full bg-gold/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-800">True or false?</p>}
-            <p className={`${question.type === "truefalse" ? "mt-3" : "mt-8"} whitespace-pre-line text-xl font-bold leading-8`}>{question.question}</p>
+            <div className={`${question.type === "truefalse" ? "mt-3" : "mt-8"} text-xl font-bold leading-8`}><RichText text={question.question} /></div>
             <div className={`mt-6 grid gap-3 ${question.type === "truefalse" ? "grid-cols-2" : ""}`}>{question.choices.map((choice, i) => {
               const isAnswer = i === question.answer;
               const state = selected === null ? "idle" : !reveal ? (selected === i ? "chosen" : "dim") : isAnswer ? "right" : selected === i ? "wrong" : "dim";
               const style = { idle: "border-slate-200 hover:-translate-y-0.5 hover:border-royal hover:bg-blue-50/50", chosen: "border-navy bg-navy/5 text-navy", right: "border-green-400 bg-green-50 text-green-800", wrong: "border-red-300 bg-red-50 text-red-700", dim: "border-slate-200 opacity-60" }[state];
               return <motion.button key={`${choice}-${i}`} disabled={selected !== null || timeLeft === 0} onClick={() => answer(i)} animate={state === "wrong" ? { x: [0, -6, 6, -4, 4, 0] } : state === "right" && selected === i ? { scale: [1, 1.03, 1] } : {}} transition={{ duration: 0.4 }} className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left text-sm font-semibold transition-colors ${style}`}>
-                {question.type === "truefalse" ? <span className="block w-full py-2 text-center text-lg font-extrabold">{choice}</span> : <><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-extrabold ${state === "right" ? "bg-green-500 text-white" : state === "wrong" ? "bg-red-500 text-white" : state === "chosen" ? "bg-navy text-white" : "bg-slate-100 text-slate-600"}`}>{String.fromCharCode(65 + i)}</span><span className="flex-1">{choice}</span></>}
+                {question.type === "truefalse" ? <span className="block w-full py-2 text-center text-lg font-extrabold">{choice}</span> : <><span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-extrabold ${state === "right" ? "bg-green-500 text-white" : state === "wrong" ? "bg-red-500 text-white" : state === "chosen" ? "bg-navy text-white" : "bg-slate-100 text-slate-600"}`}>{String.fromCharCode(65 + i)}</span><span className="min-w-0 flex-1"><RichText text={choice} compact /></span></>}
                 {state === "right" && <CheckCircle2 className="shrink-0 text-green-600" size={18} />}{state === "wrong" && <XCircle className="shrink-0 text-red-500" size={18} />}{state === "chosen" && <CircleCheckBig className="shrink-0 text-navy" size={18} />}
               </motion.button>;
             })}</div>
@@ -203,8 +204,8 @@ function Exam() {
               <p className="font-bold">{result.correct ? "Correct — well done! 🎉" : result.timedOut ? "⏰ Time is up — this one counts as unanswered." : "Not quite. Review the explanation."}</p>
               <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${result.xp ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500"}`}>+{result.xp} XP</span>
             </div>
-            {!result.correct && <p className="mt-1 text-sm text-slate-600">Correct answer: <b>{question.type === "truefalse" ? question.choices[question.answer] : `${String.fromCharCode(65 + question.answer)}. ${question.choices[question.answer]}`}</b></p>}
-            <p className="mt-2 text-sm leading-6 text-slate-600">{requiresSubscription ? "Subscribe to view the full teacher explanation." : question.explanation || "No explanation was provided for this question."}</p>
+            {!result.correct && <div className="mt-1 text-sm text-slate-600">Correct answer: <b><AnswerText q={question} i={question.answer} /></b></div>}
+            <div className="mt-2 text-sm leading-6 text-slate-600">{requiresSubscription ? "Subscribe to view the full teacher explanation." : question.explanation ? <RichText text={question.explanation} /> : "No explanation was provided for this question."}</div>
             <button onClick={() => requiresSubscription && setShowSubscribe(true)} className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-royal hover:underline"><Sparkles size={14} />Explanation by {question.teacher}</button>
             {user && <Link href={`/chat?subject=${encodeURIComponent(subject)}`} className="ml-4 inline-flex items-center gap-1.5 text-xs font-bold text-navy hover:underline"><MessageCircle size={14} />Ask a {subject} teacher</Link>}
           </motion.div>}
@@ -284,7 +285,11 @@ function ModePicker({ subject, grade, total, available, seconds, onStart }: { su
   );
 }
 
-const letter = (q: Question, i: number) => (q.type === "truefalse" ? q.choices[i] : `${String.fromCharCode(65 + i)}. ${q.choices[i]}`);
+/** "B. choice" (or just "True"), with any code in the choice rendered. */
+function AnswerText({ q, i }: { q: Question; i: number }) {
+  if (q.type === "truefalse") return <>{q.choices[i]}</>;
+  return <span className="min-w-0">{String.fromCharCode(65 + i)}. <RichText text={q.choices[i] ?? ""} compact /></span>;
+}
 
 /** End-of-session results, with a question-by-question review. */
 function Summary({ subject, grade, questions, results: byIndex, total, saves, mode, explanations, onRestart, onSubscribe }: {
@@ -347,14 +352,14 @@ function Summary({ subject, grade, questions, results: byIndex, total, saves, mo
               <div className="flex items-start gap-3">
                 <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold text-white ${r.correct ? "bg-green-500" : r.timedOut ? "bg-amber-400" : "bg-red-500"}`}>{i + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="whitespace-pre-line font-semibold">{q.question}</p>
+                  <div className="font-semibold"><RichText text={q.question} /></div>
                   <div className="mt-2 grid gap-1 text-sm">
                     {r.timedOut ? <p className="flex items-center gap-1.5 font-semibold text-amber-700"><Clock3 size={15} /> Not answered — time ran out</p>
-                      : <p className={`flex items-start gap-1.5 font-semibold ${r.correct ? "text-green-700" : "text-red-600"}`}>{r.correct ? <CheckCircle2 size={15} className="mt-0.5 shrink-0" /> : <XCircle size={15} className="mt-0.5 shrink-0" />}Your answer: {letter(q, r.choice)}</p>}
-                    {!r.correct && <p className="flex items-start gap-1.5 font-semibold text-green-700"><CheckCircle2 size={15} className="mt-0.5 shrink-0" />Correct answer: {letter(q, q.answer)}</p>}
+                      : <div className={`flex items-start gap-1.5 font-semibold ${r.correct ? "text-green-700" : "text-red-600"}`}>{r.correct ? <CheckCircle2 size={15} className="mt-0.5 shrink-0" /> : <XCircle size={15} className="mt-0.5 shrink-0" />}Your answer: <AnswerText q={q} i={r.choice} /></div>}
+                    {!r.correct && <div className="flex items-start gap-1.5 font-semibold text-green-700"><CheckCircle2 size={15} className="mt-0.5 shrink-0" />Correct answer: <AnswerText q={q} i={q.answer} /></div>}
                   </div>
                   {explanations
-                    ? <p className="mt-2 rounded-xl bg-white/80 p-3 text-sm leading-6 text-slate-600"><b className="text-navy">Explanation:</b> {q.explanation || "No explanation was provided for this question."}</p>
+                    ? <div className="mt-2 rounded-xl bg-white/80 p-3 text-sm leading-6 text-slate-600"><b className="text-navy">Explanation:</b> {q.explanation ? <RichText text={q.explanation} /> : "No explanation was provided for this question."}</div>
                     : <button onClick={onSubscribe} className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-royal hover:underline"><Lock size={12} /> Subscribe to see the teacher&apos;s explanation</button>}
                 </div>
               </div>

@@ -5,6 +5,7 @@ import { useRef, useState, type DragEvent } from "react";
 import { TEMPLATE, convertType, validate, type ParsedQuestion, type QuestionType } from "@/lib/questionParser";
 import { useSubjects } from "@/app/components/useSubjects";
 import GradePills from "@/app/components/GradePills";
+import CodeTextarea from "@/app/components/CodeTextarea";
 import ChoiceEditor from "./ChoiceEditor";
 import { gradesFor } from "@/lib/subjects";
 
@@ -169,7 +170,7 @@ export default function ImportDialog({ defaultSubject, lockSubject = false, onCl
                   <li key={i} className={`rounded-2xl border p-4 ${q.issues.length ? "border-amber-300 bg-amber-50/40" : "border-slate-200"}`}>
                     <div className="flex items-start gap-2">
                       <span className="mt-2 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-navy text-[11px] font-bold text-white">{i + 1}</span>
-                      <textarea value={q.prompt} onChange={(e) => update(i, { prompt: e.target.value })} rows={2} className="min-h-12 flex-1 rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-semibold" />
+                      <CodeTextarea className="min-w-0 flex-1 text-sm" rows={2} value={q.prompt} onChange={(prompt) => update(i, { prompt })} />
                       <button type="button" onClick={() => setQuestions((list) => list.filter((_, j) => j !== i))} className="mt-1.5 rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Remove question"><Trash2 size={16} /></button>
                     </div>
                     <div className="mt-2 flex gap-1.5 pl-8">

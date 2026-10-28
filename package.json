@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/generate-dark-theme.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "theme:dark": "node scripts/generate-dark-theme.mjs"
   },
   "dependencies": {
     "@types/three": "^0.184.1",

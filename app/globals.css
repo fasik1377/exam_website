@@ -165,3 +165,20 @@ button:not(:disabled) {
     opacity: 1 !important;
   }
 }
+
+/* ---------- Light / dark theme switch ---------- */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* The circular reveal (ThemeToggle) animates the new page over the old one. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+/* Fallback cross-fade where view transitions aren't available. */
+html.theme-fade,
+html.theme-fade *,
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease, fill 0.35s ease !important;
+}

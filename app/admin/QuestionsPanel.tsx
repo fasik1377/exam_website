@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { GRADES } from "@/lib/subjects";
 import EditQuestionDialog from "./EditQuestionDialog";
 import { ago, pct } from "./ResultsPanel";
+import { plainSummary } from "@/lib/highlight";
 
 export type QuestionRow = {
   id: string; prompt: string; type: "mcq" | "truefalse"; grade: string; unit: string; year: string;
@@ -77,7 +78,7 @@ export default function QuestionsPanel({ subject, rows, canManageAll, onChanged,
                     {!q.published && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Hidden</span>}
                     {!q.mine && <span className="text-slate-400">by {q.teacher}</span>}
                   </div>
-                  <p className="mt-1.5 font-semibold">{q.prompt}</p>
+                  <p className="mt-1.5 line-clamp-2 font-semibold" title={plainSummary(q.prompt)}>{plainSummary(q.prompt)}</p>
                   <p className="mt-1 text-xs text-slate-500">{q.answers ? <>Answered {q.answers}× · <b className="text-navy">{p}% correct</b></> : "No answers yet"} · added {ago(q.createdAt)}</p>
                 </div>
                 {q.answers > 0 && (

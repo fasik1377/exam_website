@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { ListChecks, LoaderCircle, Save, ToggleLeft, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import CodeTextarea from "@/app/components/CodeTextarea";
 import GradePills from "@/app/components/GradePills";
 import { useSubjects } from "@/app/components/useSubjects";
 import { gradesFor } from "@/lib/subjects";
@@ -74,14 +75,10 @@ export default function EditQuestionDialog({ question, subject, onClose, onSaved
           ))}
         </div>
 
-        <label className="mt-5 block text-sm font-bold">Question
-          <textarea required value={form.prompt} onChange={(e) => setForm({ ...form, prompt: e.target.value })} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" />
-        </label>
+        <CodeTextarea className="mt-5" label="Question" required rows={3} value={form.prompt} onChange={(prompt) => setForm({ ...form, prompt })} />
         <p className="mt-4 text-sm font-bold">{form.type === "truefalse" ? "Correct answer" : "Choices"}</p>
         <div className="mt-2"><ChoiceEditor type={form.type} name="edit" choices={form.choices} correctAnswer={form.correctAnswer} onChange={(next) => setForm({ ...form, ...next })} /></div>
-        <label className="mt-5 block text-sm font-bold">Explanation <span className="font-normal text-slate-400">(optional)</span>
-          <textarea value={form.explanation} onChange={(e) => setForm({ ...form, explanation: e.target.value })} rows={2} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" />
-        </label>
+        <CodeTextarea className="mt-5" label="Explanation (optional)" rows={2} value={form.explanation} onChange={(explanation) => setForm({ ...form, explanation })} />
 
         {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
         <div className="mt-6 grid grid-cols-2 gap-2">

@@ -4,6 +4,7 @@ import { BookOpen, ChevronDown, GraduationCap, LayoutDashboard, LoaderCircle, Lo
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { dashboardFor, useSession, type SessionUser } from "@/app/components/useSession";
+import ThemeToggle from "@/app/components/ThemeToggle";
 
 const ROLE: Record<SessionUser["role"], { label: string; icon: typeof GraduationCap; badge: string }> = {
   student: { label: "Student", icon: GraduationCap, badge: "bg-blue-50 text-royal" },
@@ -18,7 +19,8 @@ export async function signOut(everywhere = false) {
 }
 
 /** Account button with role, quick links, and sign-out — the same in every signed-in area. */
-export default function AccountMenu({ tone = "dark", align = "right" }: { tone?: "light" | "dark"; align?: "right" | "left" | "up" }) {
+export default function AccountMenu({ tone = "dark", align = "right", themeToggle = true }: { tone?: "light" | "dark"; align?: "right" | "left" | "up"; themeToggle?: boolean }) {
+  const toggle = themeToggle ? <ThemeToggle tone={tone} /> : null;
   const { user, loading } = useSession();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<"" | "here" | "everywhere">("");
@@ -34,8 +36,8 @@ export default function AccountMenu({ tone = "dark", align = "right" }: { tone?:
     return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
   }, [open]);
 
-  if (loading) return <span className={`h-10 w-28 animate-pulse rounded-xl ${tone === "light" ? "bg-white/10" : "bg-slate-100"}`} />;
-  if (!user) return <Link href="/login" className={`rounded-xl px-3 py-2 text-sm font-bold ${tone === "light" ? "text-white hover:bg-white/10" : "text-navy hover:bg-slate-100"}`}>Sign in</Link>;
+  if (loading) return <span className="flex items-center gap-2">{toggle}<span className={`h-10 w-28 animate-pulse rounded-xl ${tone === "light" ? "bg-white/10" : "bg-slate-100"}`} /></span>;
+  if (!user) return <span className="flex items-center gap-2">{toggle}<Link href="/login" className={`rounded-xl px-3 py-2 text-sm font-bold ${tone === "light" ? "text-white hover:bg-white/10" : "text-navy hover:bg-slate-100"}`}>Sign in</Link></span>;
 
   const role = ROLE[user.role];
   // "up" (sidebar footer) spans the sidebar width so it never gets clipped.
@@ -46,7 +48,9 @@ export default function AccountMenu({ tone = "dark", align = "right" }: { tone?:
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div className={`flex items-center gap-2 ${align === "up" ? "w-full" : ""}`}>
+    {toggle}
+    <div ref={ref} className={`relative ${align === "up" ? "min-w-0 flex-1" : ""}`}>
       <button
         onClick={() => setOpen(!open)}
         aria-haspopup="menu"
@@ -86,6 +90,7 @@ export default function AccountMenu({ tone = "dark", align = "right" }: { tone?:
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
     </div>
   );
 }

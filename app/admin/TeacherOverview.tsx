@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle, BookOpen, CheckCircle2, GraduationCap, Target, Users, XCircle } from "lucide-react";
 import { Meter, Sparkline, TrendChart } from "@/app/super-admin/charts";
 import { ago, pct, standing, type StudentRow } from "./ResultsPanel";
+import { plainSummary } from "@/lib/highlight";
 
 export type Overview = {
   subject: string; questions: number; myQuestions: number; students: number; activeLearners: number;
@@ -75,7 +76,7 @@ export default function TeacherOverview({ data, students, onOpenResults }: { dat
                 const p = pct(h.correct, h.total);
                 return (
                   <li key={h.id} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-slate-100 p-3 text-sm">
-                    <span className="min-w-0"><span className="line-clamp-2 font-semibold">{h.prompt}</span><span className="text-xs text-slate-500">{h.grade} · {h.total} answers</span></span>
+                    <span className="min-w-0"><span className="line-clamp-2 font-semibold">{plainSummary(h.prompt)}</span><span className="text-xs text-slate-500">{h.grade} · {h.total} answers</span></span>
                     <span className="text-right"><b className="tabular-nums">{p}%</b><span className="block text-[11px] text-slate-400">correct</span></span>
                   </li>
                 );

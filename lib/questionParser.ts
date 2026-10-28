@@ -79,7 +79,31 @@ function restoreLines(text: string) {
 
 type Draft = ParsedQuestion & { tfHint: boolean; answerToken: string | null };
 
+const FENCE = /^[ \t]*```[ \t]*([\w+#.-]*)[^\n]*\n([\s\S]*?)\n?[ \t]*```[ \t]*$/gm;
+
+/**
+ * Parses questions, keeping ``` code blocks exactly as written: they are set aside while the
+ * text is analysed (so numbered code lines aren't mistaken for questions) and put back after.
+ */
 export function parseQuestions(raw: string): { questions: ParsedQuestion[]; warnings: string[] } {
+  const blocks: string[] = [];
+  const stashed = raw.replace(/\r\n?/g, "\n").replace(FENCE, (_, lang: string, code: string) => {
+    blocks.push("```" + lang + "\n" + code.replace(/\s+$/, "") + "\n```");
+    return `\n⟦CODE${blocks.length - 1}⟧\n`;
+  });
+  const result = parseText(stashed);
+  if (!blocks.length) return result;
+  const restore = (text: string) => text.replace(/\s*⟦CODE(\d+)⟧\s*/g, (_, i: string) => `\n${blocks[Number(i)]}\n`).trim();
+  for (const q of result.questions) {
+    q.prompt = restore(q.prompt);
+    q.explanation = restore(q.explanation);
+    q.choices = q.choices.map(restore);
+    validate(q);
+  }
+  return result;
+}
+
+function parseText(raw: string): { questions: ParsedQuestion[]; warnings: string[] } {
   const warnings: string[] = [];
   const text = restoreLines(raw.replace(/\r\n?/g, "\n").replace(/[ \t]/g, " ").replace(/[•▪●]/g, ""));
   const lines = text.split("\n").map((l) => l.trim()).flatMap(splitInlineChoices).map((l) => l.trim()).filter(Boolean);

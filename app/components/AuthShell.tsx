@@ -1,6 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
 import { useReducedMotionSafe } from "@/app/components/useReducedMotionSafe";
+import ThemeToggle from "@/app/components/ThemeToggle";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, type InputHTMLAttributes, type ReactNode } from "react";
@@ -45,7 +46,7 @@ export default function AuthShell({ eyebrow, title, points, children }: ShellPro
 
       <header className="relative flex items-center justify-between px-5 py-5 sm:px-8">
         <Link href="/" className="glass inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/15"><ArrowLeft size={16} /> Back home</Link>
-        <span className="hidden text-xs font-bold uppercase tracking-[.18em] text-gold/80 sm:block">{eyebrow}</span>
+        <span className="flex items-center gap-3"><span className="hidden text-xs font-bold uppercase tracking-[.18em] text-gold/80 sm:block">{eyebrow}</span><ThemeToggle tone="light" className="glass" /></span>
       </header>
 
       <div className="relative flex flex-1 flex-col items-center justify-center px-4 pb-10 pt-16">

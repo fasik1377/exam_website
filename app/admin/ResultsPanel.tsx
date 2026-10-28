@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDownUp, CheckCircle2, Download, LoaderCircle, MessageCircle, Search, X, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { GRADES, streamLabel } from "@/lib/subjects";
+import { plainSummary } from "@/lib/highlight";
 
 export type StudentRow = {
   id: string; name: string; email: string; grade: string | null; stream: "natural" | "social" | null; status: string;
@@ -209,7 +210,7 @@ function StudentDrawer({ id, subjectQuery, onClose }: { id: string; subjectQuery
                     <div className="flex items-start gap-2.5">
                       {a.correct ? <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-green-600" /> : <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />}
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold">{a.prompt}</p>
+                        <p className="line-clamp-2 text-sm font-semibold">{plainSummary(a.prompt)}</p>
                         <p className="mt-1 text-xs text-slate-600">
                           Answered: <b className={a.correct ? "text-green-700" : "text-red-600"}>{a.chosen}</b>
                           {!a.correct && <> · Correct: <b className="text-green-700">{a.answer}</b></>}
