@@ -8,7 +8,7 @@ import { GRADES, needsStream, type Stream } from "@/lib/subjects";
 
 /** Validates the editable fields of a subject. */
 function parse(body: Record<string, unknown>, partial: boolean) {
-  const out: Partial<Pick<DbSubject, "name" | "amharic" | "streams" | "grades" | "calculator" | "minutes" | "hidden">> = {};
+  const out: Partial<Pick<DbSubject, "name" | "amharic" | "streams" | "grades" | "calculator" | "playground" | "minutes" | "hidden">> = {};
   if (!partial || body.name !== undefined) {
     const name = cleanString(body.name, 60).replace(/\s+/g, " ");
     if (name.length < 2) return "Enter a subject name (at least 2 characters)";
@@ -33,6 +33,7 @@ function parse(body: Record<string, unknown>, partial: boolean) {
   }
   if (body.hidden !== undefined) out.hidden = body.hidden === true;
   if (body.calculator !== undefined) out.calculator = body.calculator === true;
+  if (body.playground !== undefined) out.playground = body.playground === true;
   return out;
 }
 
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
     const last = await db.collection<DbSubject>("subjects").find().sort({ order: -1 }).limit(1).next();
     const now = new Date();
     try {
-      await db.collection<DbSubject>("subjects").insertOne({ name: fields.name!, amharic: fields.amharic ?? "", streams: fields.streams!, grades: fields.grades!, calculator: fields.calculator ?? false, minutes: fields.minutes ?? 1, hidden: false, order: (last?.order ?? 0) + 1, createdAt: now, updatedAt: now });
+      await db.collection<DbSubject>("subjects").insertOne({ name: fields.name!, amharic: fields.amharic ?? "", streams: fields.streams!, grades: fields.grades!, calculator: fields.calculator ?? false, ...(fields.playground !== undefined ? { playground: fields.playground } : {}), minutes: fields.minutes ?? 1, hidden: false, order: (last?.order ?? 0) + 1, createdAt: now, updatedAt: now });
     } catch (error) {
       if ((error as { code?: number }).code === 11000) return Response.json({ error: "A subject with this name already exists" }, { status: 409 });
       throw error;

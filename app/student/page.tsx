@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
 import { useSubjects } from "@/app/components/useSubjects";
-import { GRADES, STREAMS, needsStream, secondsPerQuestion, streamLabel, subjectsForStudent, type Stream } from "@/lib/subjects";
+import { GRADES, STREAMS, hasPlayground, needsStream, secondsPerQuestion, streamLabel, subjectsForStudent, type Stream } from "@/lib/subjects";
 import { Badges, Leaderboard, LevelCard, WeekActivity, type Badge, type Level } from "./Engagement";
 import { plainSummary } from "@/lib/highlight";
 
@@ -20,6 +20,8 @@ type Summary = {
   subjects: { subject: string; total: number; correct: number }[];
   recent: { prompt: string; subject: string; correct: boolean; timedOut?: boolean; createdAt: string }[];
 };
+
+const SNIPPET = ["<h1>Hello</h1>", "<style>", "  h1 { color: gold; }", "</style>", "<script>", "  console.log(\"Hi!\");", "</script>"].join("\n");
 
 const TIPS = [
   "Little and often beats cramming — 10 questions a day adds up to 3,650 a year.",
@@ -58,6 +60,7 @@ export default function StudentDashboard() {
     { label: "XP this week", value: data?.weekXp ?? "–", icon: Zap, tint: "bg-violet-50 text-violet-600" },
     { label: "Badges earned", value: data ? `${earned}/${data.badges.length}` : "–", icon: CheckCircle2, tint: "bg-green-50 text-green-600" },
   ];
+  const codeSubjects = grade ? subjectsForStudent(grade, stream, subjectList).filter(hasPlayground).map((s) => s.name) : [];
   const tip = TIPS[new Date().getDate() % TIPS.length];
   const examLink = (subject: string) => `/exam?grade=${encodeURIComponent(grade ?? "Grade 12")}&subject=${encodeURIComponent(subject)}`;
 
@@ -155,6 +158,22 @@ export default function StudentDashboard() {
             </>
           )}
         </section>
+
+        {/* Web subjects: open the HTML / CSS / JavaScript playground */}
+        {codeSubjects.map((name) => (
+          <motion.section key={name} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-[#0d1526] p-6 text-white">
+            <pre aria-hidden className="pointer-events-none absolute -right-6 top-3 hidden font-mono text-[12px] leading-5 text-white/[.08] sm:block">{SNIPPET}</pre>
+            <div className="relative grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[.16em] text-gold">{name}</p>
+                <h2 className="mt-1 text-xl font-extrabold">Code playground — try it yourself</h2>
+                <p className="mt-1 max-w-xl text-sm text-white/70">Write HTML, CSS and JavaScript and watch it run instantly, with a console for your <code className="font-mono text-gold">console.log()</code> output. Start from an example or a blank page.</p>
+                <p className="mt-3 flex flex-wrap gap-1.5 text-[11px] font-bold">{["HTML", "CSS", "JavaScript"].map((l, k) => <span key={l} className="rounded-full bg-white/10 px-2.5 py-1"><i className={`mr-1.5 inline-block h-2 w-2 rounded-full ${["bg-[#e34c26]", "bg-[#2965f1]", "bg-[#f7df1e]"][k]}`} />{l}</span>)}</p>
+              </div>
+              <Link href={`/playground?subject=${encodeURIComponent(name)}`} className="btn-shine inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-bold text-white hover:bg-green-500"><span className="font-mono">&lt;/&gt;</span> Open playground</Link>
+            </div>
+          </motion.section>
+        ))}
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           <section className="rounded-3xl border border-slate-200 bg-white p-6">

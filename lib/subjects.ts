@@ -11,6 +11,8 @@ export type Subject = {
   minutes?: number;
   /** Show the scientific calculator during practice. */
   calculator?: boolean;
+  /** Offer the HTML / CSS / JavaScript code playground (web subjects). */
+  playground?: boolean;
   /** Hidden subjects stay in the database but are not offered to students or new teachers. */
   hidden?: boolean;
 };
@@ -47,6 +49,10 @@ export const isCommon = (subject: Subject) => subject.streams.length > 1;
 const CALCULATOR_DEFAULT = ["Mathematics", "Physics", "Chemistry", "Biology", "Economics", "Scholastic Aptitude"];
 export const hasCalculator = (subject?: Pick<Subject, "name" | "calculator"> | null) =>
   !!subject && (subject.calculator ?? CALCULATOR_DEFAULT.includes(subject.name));
+
+/** Web subjects (e.g. "Website Development and Design") get the code playground unless switched off. */
+export const hasPlayground = (subject?: Pick<Subject, "name" | "playground"> | null) =>
+  !!subject && (subject.playground ?? /\bweb|website|html/i.test(subject.name));
 
 export const GRADES = ["Grade 9", "Grade 10", "Grade 11", "Grade 12"] as const;
 export type Grade = (typeof GRADES)[number];

@@ -1,13 +1,13 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Atom, BookOpenText, Calculator, Check, Clock3, Eye, EyeOff, GraduationCap, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Atom, BookOpenText, Calculator, Check, Clock3, CodeXml, Eye, EyeOff, GraduationCap, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { refreshSubjects } from "@/app/components/useSubjects";
-import { GRADES, gradeRange, needsStream, type Grade, type Stream } from "@/lib/subjects";
+import { GRADES, gradeRange, hasPlayground, needsStream, type Grade, type Stream } from "@/lib/subjects";
 
-type Row = { id: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; calculator: boolean; minutes: number; hidden: boolean; questions: number; teachers: number };
-type Draft = { id?: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; calculator: boolean; minutes: number };
-const EMPTY: Draft = { name: "", amharic: "", streams: ["natural", "social"], grades: [...GRADES], calculator: false, minutes: 1 };
+type Row = { id: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; calculator: boolean; playground: boolean; minutes: number; hidden: boolean; questions: number; teachers: number };
+type Draft = { id?: string; name: string; amharic: string; streams: Stream[]; grades: Grade[]; calculator: boolean; playground: boolean; minutes: number };
+const EMPTY: Draft = { name: "", amharic: "", streams: ["natural", "social"], grades: [...GRADES], calculator: false, playground: false, minutes: 1 };
 const PRESETS: { label: string; grades: Grade[] }[] = [
   { label: "All grades (9–12)", grades: [...GRADES] },
   { label: "Grades 9–10", grades: ["Grade 9", "Grade 10"] },
@@ -76,10 +76,11 @@ export default function SubjectsSection({ onToast }: { onToast: (ok: boolean, te
               ))}
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-royal"><Clock3 size={11} />{r.minutes} min / question</span>
               {r.calculator && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700"><Calculator size={11} />Calculator</span>}
+              {r.playground && <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-0.5 text-cyan-700"><CodeXml size={11} />Code playground</span>}
             </div>
             <p className="mt-3 text-sm text-slate-500"><b className="text-navy">{r.questions}</b> question{r.questions === 1 ? "" : "s"} · <b className="text-navy">{r.teachers}</b> teacher{r.teachers === 1 ? "" : "s"}</p>
             <div className="mt-4 flex gap-1.5">
-              <button onClick={() => setDraft({ id: r.id, name: r.name, amharic: r.amharic, streams: r.streams, grades: r.grades, calculator: r.calculator, minutes: r.minutes })} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal"><Pencil size={13} /> Edit</button>
+              <button onClick={() => setDraft({ id: r.id, name: r.name, amharic: r.amharic, streams: r.streams, grades: r.grades, calculator: r.calculator, playground: r.playground, minutes: r.minutes })} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal"><Pencil size={13} /> Edit</button>
               <button disabled={busy === r.id} onClick={() => call("PATCH", r, { hidden: !r.hidden }, r.hidden ? `${r.name} is visible again.` : `${r.name} is hidden from students and new teachers.`)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold hover:border-royal disabled:opacity-50">
                 {busy === r.id ? <LoaderCircle size={13} className="animate-spin" /> : r.hidden ? <Eye size={13} /> : <EyeOff size={13} />}{r.hidden ? "Show" : "Hide"}
               </button>
@@ -100,6 +101,8 @@ export default function SubjectsSection({ onToast }: { onToast: (ok: boolean, te
 
 function SubjectDialog({ draft, onClose, onSaved }: { draft: Draft; onClose: () => void; onSaved: (text: string) => void }) {
   const [form, setForm] = useState(draft);
+  // New web subjects get the playground ticked automatically until the admin changes it.
+  const [playgroundTouched, setPlaygroundTouched] = useState(Boolean(draft.id));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const editing = Boolean(draft.id);
@@ -132,7 +135,7 @@ function SubjectDialog({ draft, onClose, onSaved }: { draft: Draft; onClose: () 
         </div>
         {editing && <p className="mt-1 text-xs text-slate-500">Renaming also updates this subject&apos;s questions, teachers and chat room.</p>}
         <label className="mt-5 block text-sm font-semibold">Subject name
-          <input required minLength={2} maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Information Technology" className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 outline-none focus:border-royal" />
+          <input required minLength={2} maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value, ...(playgroundTouched ? {} : { playground: hasPlayground({ name: e.target.value }) }) })} placeholder="e.g. Information Technology" className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 outline-none focus:border-royal" />
         </label>
         <label className="mt-4 block text-sm font-semibold">Amharic name <span className="font-normal text-slate-400">(optional)</span>
           <input maxLength={60} value={form.amharic} onChange={(e) => setForm({ ...form, amharic: e.target.value })} placeholder="e.g. ኢንፎርሜሽን ቴክኖሎጂ" className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 font-amharic outline-none focus:border-royal" />
@@ -176,6 +179,10 @@ function SubjectDialog({ draft, onClose, onSaved }: { draft: Draft; onClose: () 
         <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3.5 hover:border-royal">
           <input type="checkbox" checked={form.calculator} onChange={(e) => setForm({ ...form, calculator: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[#155EEF]" />
           <span><span className="flex items-center gap-1.5 text-sm font-bold"><Calculator size={15} /> Scientific calculator</span><span className="text-xs text-slate-500">Students can open a calculator (powers, log, trig in degrees/radians, π, science constants) while practising.</span></span>
+        </label>
+        <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3.5 hover:border-royal">
+          <input type="checkbox" checked={form.playground} onChange={(e) => { setPlaygroundTouched(true); setForm({ ...form, playground: e.target.checked }); }} className="mt-0.5 h-4 w-4 accent-[#155EEF]" />
+          <span><span className="flex items-center gap-1.5 text-sm font-bold"><CodeXml size={15} /> Code playground</span><span className="text-xs text-slate-500">Students can write HTML, CSS and JavaScript and run it right on the page (like W3Schools &ldquo;Try it yourself&rdquo;).</span></span>
         </label>
         {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
         <div className="mt-6 grid grid-cols-2 gap-2">

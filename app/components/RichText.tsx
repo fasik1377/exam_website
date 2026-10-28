@@ -1,7 +1,17 @@
 "use client";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Play } from "lucide-react";
 import { Fragment, useState } from "react";
-import { highlight, languageLabel, segments, type TokenKind } from "@/lib/highlight";
+import { highlight, languageLabel, normalizeLang, segments, type TokenKind } from "@/lib/highlight";
+
+/** Asks the page's playground to open with this code; falls back to the playground page in a new tab. */
+function tryIt(lang: string, code: string) {
+  const event = new CustomEvent("playground:open", { detail: { lang, code }, cancelable: true });
+  if (!window.dispatchEvent(event)) return; // the exam page opened its own playground
+  import("@/app/playground/Playground").then(({ handOff, projectFromSnippet }) => {
+    handOff(projectFromSnippet(lang, code));
+    window.open("/playground", "_blank", "noopener");
+  });
+}
 
 const COLOR: Record<TokenKind, string> = {
   plain: "text-slate-100", kw: "text-[#c792ea]", str: "text-[#c3e88d]", com: "italic text-[#7f8ca3]", num: "text-[#f78c6c]",
@@ -26,6 +36,7 @@ function InlineText({ text }: { text: string }) {
 export function CodeBlock({ code, lang, compact = false }: { code: string; lang: string; compact?: boolean }) {
   const [copied, setCopied] = useState(false);
   const lines = highlight(code, lang);
+  const runnable = ["html", "css", "javascript"].includes(normalizeLang(lang));
   async function copy(e: React.MouseEvent) {
     e.stopPropagation();
     try { await navigator.clipboard.writeText(code); setCopied(true); window.setTimeout(() => setCopied(false), 1500); } catch {}
@@ -38,8 +49,16 @@ export function CodeBlock({ code, lang, compact = false }: { code: string; lang:
           <span className="ml-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{languageLabel(lang)}</span>
         </span>
         {!compact && (
+          <span className="flex items-center gap-1">
+          {runnable && (
+            <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); tryIt(normalizeLang(lang), code); }} onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); tryIt(normalizeLang(lang), code); } }}
+              title="Run this code in the playground" className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-green-600 px-1.5 py-0.5 text-[11px] font-bold text-white hover:bg-green-500">
+              <Play size={11} fill="currentColor" /> Try it
+            </span>
+          )}
           <span role="button" tabIndex={0} onClick={copy} onKeyDown={(e) => e.key === "Enter" && copy(e as unknown as React.MouseEvent)} className="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-slate-400 hover:bg-white/10 hover:text-white">
             {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+          </span>
           </span>
         )}
       </div>

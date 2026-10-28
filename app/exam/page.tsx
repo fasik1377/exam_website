@@ -8,7 +8,9 @@ import Brand from "@/app/components/Brand";
 import BackButton from "@/app/components/BackButton";
 import { useSubjects } from "@/app/components/useSubjects";
 import { xpFor } from "@/lib/gamification";
-import { hasCalculator, secondsPerQuestion } from "@/lib/subjects";
+import { hasCalculator, hasPlayground, secondsPerQuestion } from "@/lib/subjects";
+import Playground, { projectFromSnippet } from "@/app/playground/Playground";
+import type { Project } from "@/app/playground/examples";
 import Calculator from "./Calculator";
 import RichText from "@/app/components/RichText";
 import { useSearchParams } from "next/navigation";
@@ -38,6 +40,20 @@ function Exam() {
   const subjectList = useSubjects();
   const duration = secondsPerQuestion(subject, subjectList);
   const calculator = hasCalculator(subjectList.find((s) => s.name === subject));
+  const playground = hasPlayground(subjectList.find((s) => s.name === subject));
+  const [coding, setCoding] = useState<{ initial: Project | null; n: number } | null>(null);
+
+  // "Try it" on a code block opens the playground here, so the exam (and its timer) stays on screen.
+  useEffect(() => {
+    if (!playground) return;
+    const onOpen = (e: Event) => {
+      const { lang, code } = (e as CustomEvent<{ lang: string; code: string }>).detail;
+      e.preventDefault();
+      setCoding((c) => ({ initial: projectFromSnippet(lang, code), n: (c?.n ?? 0) + 1 }));
+    };
+    window.addEventListener("playground:open", onOpen);
+    return () => window.removeEventListener("playground:open", onOpen);
+  }, [playground]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [access, setAccess] = useState<Access>({ limited: false, total: 0, freeQuestions: 0 });
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -124,6 +140,7 @@ function Exam() {
       if (!mode || !question || finished || locked || showSubscribe || e.metaKey || e.ctrlKey || e.altKey) return;
       // Typing in the calculator (or any field) must not answer the question.
       if (e.target instanceof HTMLElement && (e.target.closest("input, textarea, select") || e.target.closest("#calculator-panel"))) return;
+      if (coding) return; // the code playground is open
       const k = e.key.toLowerCase();
       const pick = "abcd".indexOf(k) >= 0 ? "abcd".indexOf(k) : "1234".indexOf(k);
       if (pick >= 0 && pick < question.choices.length && !result) { e.preventDefault(); answer(pick); }
@@ -220,6 +237,25 @@ function Exam() {
       </motion.section>}
     </div>
     {mode && !finished && calculator && <Calculator />}
+    {mode && !finished && playground && !coding && (
+      <motion.button type="button" onClick={() => setCoding({ initial: null, n: 0 })} whileTap={{ scale: 0.95 }}
+        className="fixed bottom-5 left-5 z-40 inline-flex items-center gap-2 rounded-2xl bg-[#0d1526] px-4 py-3 text-sm font-bold text-white shadow-xl ring-1 ring-white/10 hover:bg-royal">
+        <span className="font-mono text-gold">&lt;/&gt;</span> Code editor
+      </motion.button>
+    )}
+    <AnimatePresence>
+      {coding && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] overflow-y-auto bg-navy/60 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-label="Code playground">
+          <motion.div initial={{ y: 24, scale: 0.98 }} animate={{ y: 0, scale: 1 }} exit={{ y: 24, scale: 0.98 }} className="mx-auto max-w-7xl">
+            <div className="mb-2 flex items-center justify-between gap-2 px-1 text-sm font-semibold text-white">
+              <span>Question {Math.min(index + 1, total)} of {total}{!result && !locked ? ` · ⏱ ${clock(timeLeft)} left` : ""}</span>
+              <button type="button" onClick={() => setCoding(null)} className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-navy hover:bg-gold">Back to the question</button>
+            </div>
+            <Playground key={coding.n} storageKey={`exam:${subject}`} initial={coding.initial} title={`${subject} · try it yourself`} onClose={() => setCoding(null)} />
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
     {showSubscribe && <SubscriptionDialog onClose={() => setShowSubscribe(false)} />}
   </main>;
 }

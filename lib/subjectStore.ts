@@ -1,6 +1,6 @@
 import type { ObjectId } from "mongodb";
 import { getDb } from "@/lib/db";
-import { GRADES, SUBJECTS, gradesOf, hasCalculator, type Grade, type Stream, type Subject } from "@/lib/subjects";
+import { GRADES, SUBJECTS, gradesOf, hasCalculator, hasPlayground, type Grade, type Stream, type Subject } from "@/lib/subjects";
 
 /** Subjects live in MongoDB so the super admin can manage them; this module is the only reader/writer. */
 export type DbSubject = {
@@ -10,6 +10,7 @@ export type DbSubject = {
   streams: Stream[];
   grades?: Grade[];
   calculator?: boolean;
+  playground?: boolean;
   minutes: number;
   hidden: boolean;
   order: number;
@@ -36,7 +37,7 @@ function seed() {
   return cache.subjectSeed;
 }
 
-const toSubject = (s: DbSubject): Subject => ({ id: s._id!.toString(), name: s.name, amharic: s.amharic, streams: s.streams, grades: gradesOf(s), calculator: hasCalculator(s), minutes: s.minutes, hidden: s.hidden });
+const toSubject = (s: DbSubject): Subject => ({ id: s._id!.toString(), name: s.name, amharic: s.amharic, streams: s.streams, grades: gradesOf(s), calculator: hasCalculator(s), playground: hasPlayground(s), minutes: s.minutes, hidden: s.hidden });
 
 /** All subjects (cached briefly). Pass `includeHidden` for admin views and validating existing data. */
 export async function getSubjects({ includeHidden = false } = {}): Promise<Subject[]> {

@@ -111,6 +111,7 @@ html.dark .hover\:bg-blue-50\/40:hover { background-color: color-mix(in srgb, co
 html.dark .hover\:bg-blue-50\/50:hover { background-color: color-mix(in srgb, color-mix(in srgb, #3b82f6 12%, transparent) 50%, transparent); }
 html.dark .hover\:bg-blue-50\/60:hover { background-color: color-mix(in srgb, color-mix(in srgb, #3b82f6 12%, transparent) 60%, transparent); }
 html.dark .hover\:bg-green-100:hover { background-color: color-mix(in srgb, #22c55e 20%, transparent); }
+html.dark .hover\:bg-green-500:hover { background-color: #22c55e; }
 html.dark .hover\:bg-green-700:hover { background-color: #22c55e; }
 html.dark .hover\:bg-red-100:hover { background-color: color-mix(in srgb, #ef4444 20%, transparent); }
 html.dark .hover\:bg-red-50:hover { background-color: color-mix(in srgb, #ef4444 12%, transparent); }
