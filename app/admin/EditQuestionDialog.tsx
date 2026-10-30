@@ -7,6 +7,7 @@ import GradePills from "@/app/components/GradePills";
 import { useSubjects } from "@/app/components/useSubjects";
 import { gradesFor } from "@/lib/subjects";
 import ChoiceEditor from "./ChoiceEditor";
+import SourceFields from "./SourceFields";
 import type { QuestionRow } from "./QuestionsPanel";
 
 /** Edit a published question: text, choices (add / remove), correct answer, explanation, grade, unit, year. */
@@ -62,10 +63,7 @@ export default function EditQuestionDialog({ question, subject, onClose, onSaved
         </div>
 
         <div className="mt-5"><GradePills value={form.grade} allowed={grades} subject={subject} label="Grade" onChange={(grade) => setForm({ ...form, grade })} /></div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <label className="text-sm font-bold">Unit<input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
-          <label className="text-sm font-bold">Exam year<input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
-        </div>
+        <div className="mt-4"><SourceFields unit={form.unit} year={form.year} onChange={(next) => setForm({ ...form, ...next })} /></div>
 
         <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5" role="radiogroup" aria-label="Question type">
           {([["mcq", "Multiple choice", ListChecks], ["truefalse", "True / False", ToggleLeft]] as const).map(([value, label, Icon]) => (

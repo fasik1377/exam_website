@@ -143,3 +143,28 @@ export function notifyDecision(user: Applicant2, approved: boolean) {
     `Hi ${user.name}, unfortunately your registration was not approved.`,
   );
 }
+
+type WeeklyWinner = { name: string; email: string; rank: number | null; grade: string | null; score: number; answers: number; correct: number; days: number };
+const MEDAL = ["", "🥇", "🥈", "🥉"];
+
+/** Congratulates a student of the week (sent on Saturday at 12:00). */
+export function notifyWeeklyTop(w: WeeklyWinner, week: string, perGrade: boolean) {
+  const place = `#${w.rank}${perGrade && w.grade ? ` in ${w.grade}` : ""}`;
+  return send(
+    w.email,
+    `${MEDAL[w.rank ?? 0] ?? "🏆"} You're ${place} student of the week on እውቀትNET!`,
+    layout(`Congratulations, ${w.name.split(" ")[0]}!`, `You are ${place} student of the week (${week}). Your hard work is paying off — keep it going!`, [
+      ["Rank", `${MEDAL[w.rank ?? 0] ?? ""} ${place}`],
+      ["Weekly score", `${w.score} / 100`],
+      ["Answers", `${w.correct} correct of ${w.answers}`],
+      ["Days practised", `${w.days} of 7`],
+    ], { label: "See the leaderboard", href: `${siteUrl()}/student` }),
+    `Congratulations ${w.name}! You are ${place} student of the week (${week}) on እውቀትNET with a score of ${w.score}/100 (${w.correct} correct of ${w.answers} answers, ${w.days} days).`,
+  );
+}
+
+/** Tells the platform admin who won this week. */
+export function notifyTopStudentsSummary(to: string, winners: WeeklyWinner[], week: string) {
+  const rows: [string, string][] = winners.map((w) => [`${MEDAL[w.rank ?? 0] ?? ""} #${w.rank}${w.grade ? ` · ${w.grade}` : ""}`, `${w.name} — ${w.score}/100 (${w.correct}/${w.answers}, ${w.days} days)`]);
+  return send(to, `🏆 Students of the week: ${week}`, layout("Students of the week", `These students were announced as the top performers for ${week}. They have been notified.`, rows, { label: "Open the admin dashboard", href: `${siteUrl()}/super-admin?tab=top` }), rows.map((r) => r.join(": ")).join("\n"));
+}

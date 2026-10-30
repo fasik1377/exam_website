@@ -75,6 +75,7 @@ export default function QuestionsPanel({ subject, rows, canManageAll, onChanged,
                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{q.type === "truefalse" ? <ToggleLeft size={11} /> : <ListChecks size={11} />}{q.type === "truefalse" ? "True / False" : "Multiple choice"}</span>
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{q.grade}</span>
                     {q.unit && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{q.unit}</span>}
+                    {q.year && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-royal">{q.year}</span>}
                     {!q.published && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">Hidden</span>}
                     {!q.mine && <span className="text-slate-400">by {q.teacher}</span>}
                   </div>

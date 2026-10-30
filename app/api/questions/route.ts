@@ -59,7 +59,7 @@ function toQuestion(input: Record<string, unknown>, defaults: Defaults, teacher:
   const now = new Date();
   const question: Omit<DbQuestion, "_id"> = {
     subject: cleanString(input.subject, 60) || defaults.subject, grade: cleanString(input.grade, 30) || defaults.grade,
-    unit: cleanString(input.unit, 60) || defaults.unit, year: cleanString(input.year, 30) || defaults.year || "2016 E.C.",
+    unit: cleanString(input.unit, 60) || defaults.unit, year: cleanString(input.year, 30) || defaults.year,
     type, prompt: cleanString(input.question ?? input.prompt, 6000), choices, correctAnswer, explanation: cleanString(input.explanation, 6000),
     teacherName: teacher.name, createdBy: new ObjectId(teacher.id), published: input.published !== false, createdAt: now, updatedAt: now,
   };

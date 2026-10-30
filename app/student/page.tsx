@@ -7,6 +7,7 @@ import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
 import { useSubjects } from "@/app/components/useSubjects";
 import { GRADES, STREAMS, hasPlayground, needsStream, secondsPerQuestion, streamLabel, subjectsForStudent, type Stream } from "@/lib/subjects";
+import TopStudents, { AwardBanner } from "./TopStudents";
 import { Badges, Leaderboard, LevelCard, WeekActivity, type Badge, type Level } from "./Engagement";
 import { plainSummary } from "@/lib/highlight";
 
@@ -93,6 +94,8 @@ export default function StudentDashboard() {
           </div>
         </section>
 
+        <AwardBanner />
+
         {/* Recommended next step */}
         {data?.recommendation && grade && (
           <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 rounded-3xl border-2 border-gold/60 bg-gradient-to-r from-amber-50 to-white p-5 sm:flex-row sm:items-center">
@@ -158,6 +161,8 @@ export default function StudentDashboard() {
             </>
           )}
         </section>
+
+        <TopStudents />
 
         {/* Web subjects: open the HTML / CSS / JavaScript playground */}
         {codeSubjects.map((name) => (

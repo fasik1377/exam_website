@@ -10,6 +10,7 @@ import { useSubjects } from "@/app/components/useSubjects";
 import GradePills from "@/app/components/GradePills";
 import CodeTextarea from "@/app/components/CodeTextarea";
 import { ChoiceInput } from "./ChoiceEditor";
+import SourceFields from "./SourceFields";
 import BackButton from "@/app/components/BackButton";
 import { gradesFor } from "@/lib/subjects";
 import ImportDialog from "./ImportDialog";
@@ -19,7 +20,7 @@ import TeacherOverview, { type Overview } from "./TeacherOverview";
 
 type Tab = "overview" | "questions" | "results";
 
-const initial = { type: "mcq" as "mcq" | "truefalse", subject: "Mathematics", grade: "Grade 12", unit: "Unit 1", year: "2016 E.C.", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
+const initial = { type: "mcq" as "mcq" | "truefalse", subject: "Mathematics", grade: "Grade 12", unit: "", year: "", question: "", choices: ["", "", "", ""], correctAnswer: 0, explanation: "" };
 
 async function getJson<T>(url: string): Promise<{ data?: T; error?: string }> {
   const response = await fetch(url, { cache: "no-store" }).catch(() => null);
@@ -217,11 +218,10 @@ export default function TeacherDashboard() {
                 </div>
                 <button type="button" onClick={() => setOpen(false)} className="h-9 w-9 rounded-full hover:bg-slate-100" aria-label="Close"><X className="mx-auto" size={20} /></button>
               </div>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="mt-5"><SourceFields unit={form.unit} year={form.year} units={[...new Set((questions ?? []).map((q) => q.unit))]} onChange={(next) => setForm({ ...form, ...next })} /></div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-bold">Subject<select disabled={isTeacher} title={isTeacher ? "Teachers publish in their own subject" : undefined} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal">{SUBJECTS.map((s) => <option key={s}>{s}</option>)}</select></label>
                 <div className="sm:col-span-2"><GradePills value={formGrade} allowed={formGrades} subject={form.subject} label="Which grade is this question for?" onChange={(grade) => setForm({ ...form, grade })} /></div>
-                <label className="text-sm font-bold">Unit<input required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
-                <label className="text-sm font-bold">Exam year<input required value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal" /></label>
               </div>
               {/* Question type */}
               <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5" role="radiogroup" aria-label="Question type">

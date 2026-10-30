@@ -7,6 +7,7 @@ import { useSubjects } from "@/app/components/useSubjects";
 import GradePills from "@/app/components/GradePills";
 import CodeTextarea from "@/app/components/CodeTextarea";
 import ChoiceEditor from "./ChoiceEditor";
+import SourceFields from "./SourceFields";
 import { gradesFor } from "@/lib/subjects";
 
 const ACCEPT = ".doc,.docx,.pdf,.txt";
@@ -16,7 +17,7 @@ type Props = { defaultSubject?: string; lockSubject?: boolean; onClose: () => vo
 /** Upload a .docx / .pdf / .txt exam paper, review the questions found in it, then publish them in one go. */
 export default function ImportDialog({ defaultSubject, lockSubject = false, onClose, onPublished }: Props) {
   const SUBJECTS = useSubjects();
-  const [meta, setMeta] = useState({ subject: defaultSubject || "Mathematics", grade: "Grade 12", unit: "", year: "2016 E.C." });
+  const [meta, setMeta] = useState({ subject: defaultSubject || "Mathematics", grade: "Grade 12", unit: "", year: "" });
   const [stage, setStage] = useState<"upload" | "reading" | "review">("upload");
   const [fileName, setFileName] = useState("");
   const [questions, setQuestions] = useState<ParsedQuestion[]>([]);
@@ -68,7 +69,7 @@ export default function ImportDialog({ defaultSubject, lockSubject = false, onCl
     const response = await fetch("/api/questions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...meta, grade, unit: meta.unit || "General", questions: ready.map((q) => ({ type: q.type, question: q.prompt, choices: q.choices, correctAnswer: q.correctAnswer, explanation: q.explanation })) }),
+      body: JSON.stringify({ ...meta, grade, unit: meta.unit, questions: ready.map((q) => ({ type: q.type, question: q.prompt, choices: q.choices, correctAnswer: q.correctAnswer, explanation: q.explanation })) }),
     }).catch(() => null);
     const data = await response?.json().catch(() => ({}));
     setPublishing(false);
@@ -97,10 +98,9 @@ export default function ImportDialog({ defaultSubject, lockSubject = false, onCl
 
         {/* Shared details for every question in the file */}
         <div className="mt-6"><GradePills value={grade} allowed={grades} subject={meta.subject} label="Which grade are these questions for?" onChange={(g) => setMeta({ ...meta, grade: g })} /></div>
+        <div className="mt-4"><SourceFields compact unit={meta.unit} year={meta.year} onChange={(next) => setMeta({ ...meta, ...next })} /></div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Select label="Subject" disabled={lockSubject} value={meta.subject} options={SUBJECTS.map((s) => s.name)} onChange={(v) => setMeta({ ...meta, subject: v })} />
-          <label className="text-xs font-bold text-slate-600">Unit<input value={meta.unit} onChange={(e) => setMeta({ ...meta, unit: e.target.value })} placeholder="e.g. Unit 2: Functions" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
-          <label className="text-xs font-bold text-slate-600">Exam year<input value={meta.year} onChange={(e) => setMeta({ ...meta, year: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
         </div>
 
         {error && <p className="mt-4 flex gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-sm font-semibold text-red-700"><AlertTriangle size={18} className="shrink-0" />{error}</p>}

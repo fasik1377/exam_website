@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, ChevronRight, CircleCheckBig, ClipboardList, Clock3, Eye, Flame, GraduationCap, LayoutDashboard, Lock, MessageCircle, RotateCcw, Sparkles, Trophy, X, XCircle, Zap } from "lucide-react";
+import { BookMarked, CalendarDays, CheckCircle2, ChevronRight, CircleCheckBig, ClipboardList, Clock3, Eye, Flame, GraduationCap, LayoutDashboard, Lock, MessageCircle, RotateCcw, Sparkles, Trophy, X, XCircle, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import AccountMenu from "@/app/components/AccountMenu";
@@ -200,6 +200,12 @@ function Exam() {
 
         {locked ? <div className="mt-10 rounded-2xl border border-slate-200 bg-[#f7f9fc] p-8 text-center"><Lock className="mx-auto" /><h2 className="mt-4 text-xl font-bold">{access.freeQuestions ? "Free preview complete" : "Subscription required"}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{access.freeQuestions ? `You've used the ${access.freeQuestions} free questions in ${subject}. ` : ""}Subscribe to unlock all {total} questions, every explanation and teacher support.</p><div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row"><button onClick={() => setShowSubscribe(true)} className="rounded-lg bg-navy px-4 py-3 text-sm font-bold text-white">Subscribe monthly or yearly</button>{answered > 0 && <button onClick={() => setFinished(true)} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">See my results</button>}{!user && <Link href="/signup" className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">Create student account</Link>}</div></div> : <>
           <AnimatePresence mode="wait"><motion.div key={question.id} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
+            {(question.year || question.unit) && (
+              <p className="mt-6 -mb-4 flex flex-wrap gap-1.5 text-[11px] font-bold">
+                {question.year && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-royal"><CalendarDays size={12} />{question.year}</span>}
+                {question.unit && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-slate-600"><BookMarked size={12} />{question.unit}</span>}
+              </p>
+            )}
             {question.type === "truefalse" && <p className="mt-8 inline-flex rounded-full bg-gold/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-800">True or false?</p>}
             <div className={`${question.type === "truefalse" ? "mt-3" : "mt-8"} text-xl font-bold leading-8`}><RichText text={question.question} /></div>
             <div className={`mt-6 grid gap-3 ${question.type === "truefalse" ? "grid-cols-2" : ""}`}>{question.choices.map((choice, i) => {

@@ -32,10 +32,12 @@ html.dark .bg-slate-300 { background-color: #33445f; }
 html.dark .bg-slate-400\/70 { background-color: color-mix(in srgb, #4a5b78 70%, transparent); }
 html.dark .bg-slate-50 { background-color: #152035; }
 html.dark .bg-slate-50\/60 { background-color: color-mix(in srgb, #152035 60%, transparent); }
+html.dark .bg-slate-50\/70 { background-color: color-mix(in srgb, #152035 70%, transparent); }
 html.dark .bg-teal-50 { background-color: color-mix(in srgb, #14b8a6 12%, transparent); }
 html.dark .bg-violet-100 { background-color: color-mix(in srgb, #8b5cf6 20%, transparent); }
 html.dark .bg-violet-50 { background-color: color-mix(in srgb, #8b5cf6 12%, transparent); }
 html.dark .bg-white { background-color: #111a2c; }
+html.dark .bg-white\/70 { background-color: color-mix(in srgb, #111a2c 70%, transparent); }
 html.dark .bg-white\/80 { background-color: color-mix(in srgb, #111a2c 80%, transparent); }
 html.dark .bg-white\/90 { background-color: color-mix(in srgb, #111a2c 90%, transparent); }
 html.dark .border-amber-200 { border-color: color-mix(in srgb, #f59e0b 40%, transparent); }
@@ -55,6 +57,7 @@ html.dark .border-slate-50 { border-color: #1b2740; }
 html.dark .border-white\/40 { border-color: color-mix(in srgb, #26344f 40%, transparent); }
 html.dark .fill-slate-400 { fill: #4a5b78; }
 html.dark .from-amber-50 { --tw-gradient-from: color-mix(in srgb, #f59e0b 12%, transparent); }
+html.dark .from-slate-300 { --tw-gradient-from: #33445f; }
 html.dark .ring-green-100 { --tw-ring-color: color-mix(in srgb, #22c55e 40%, transparent); }
 html.dark .ring-green-200 { --tw-ring-color: color-mix(in srgb, #22c55e 40%, transparent); }
 html.dark .ring-navy { --tw-ring-color: #9fb3d9; }
@@ -75,6 +78,8 @@ html.dark .text-green-800 { color: #86efac; }
 html.dark .text-green-900 { color: #86efac; }
 html.dark .text-indigo-600 { color: #a5b4fc; }
 html.dark .text-navy { color: #e8eefb; }
+html.dark .text-navy\/70 { color: color-mix(in srgb, #e8eefb 70%, transparent); }
+html.dark .text-navy\/75 { color: color-mix(in srgb, #e8eefb 75%, transparent); }
 html.dark .text-orange-600 { color: #fdba74; }
 html.dark .text-orange-700 { color: #fdba74; }
 html.dark .text-orange-900 { color: #fdba74; }
@@ -91,6 +96,8 @@ html.dark .text-slate-700 { color: #c5d0e0; }
 html.dark .text-teal-600 { color: #5eead4; }
 html.dark .text-violet-600 { color: #c4b5fd; }
 html.dark .text-violet-700 { color: #c4b5fd; }
+html.dark .to-amber-200 { --tw-gradient-to: color-mix(in srgb, #f59e0b 30%, transparent); }
+html.dark .to-slate-100 { --tw-gradient-to: #1b2740; }
 html.dark .to-white { --tw-gradient-to: #111a2c; }
 html.dark .disabled\:bg-slate-50:disabled { background-color: #152035; }
 html.dark .disabled\:text-slate-500:disabled { color: #94a3bd; }
@@ -125,6 +132,7 @@ html.dark .hover\:bg-white:hover { background-color: #111a2c; }
 html.dark .hover\:bg-white\/10:hover { background-color: color-mix(in srgb, #ffffff 10%, transparent); }
 html.dark .hover\:bg-white\/15:hover { background-color: color-mix(in srgb, #ffffff 15%, transparent); }
 html.dark .hover\:bg-white\/5:hover { background-color: color-mix(in srgb, #ffffff 5%, transparent); }
+html.dark .hover\:bg-white\/50:hover { background-color: color-mix(in srgb, #111a2c 50%, transparent); }
 html.dark .hover\:border-red-200:hover { border-color: color-mix(in srgb, #ef4444 40%, transparent); }
 html.dark .hover\:border-royal:hover { border-color: #155EEF; }
 html.dark .hover\:border-royal\/40:hover { border-color: color-mix(in srgb, #155EEF 40%, transparent); }
