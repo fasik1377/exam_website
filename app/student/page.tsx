@@ -1,13 +1,15 @@
 "use client";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Atom, BookOpenText, CheckCircle2, Clock3, Hash, MessageCircle, Rocket, Target, Trophy, XCircle, Zap } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Brand from "@/app/components/Brand";
 import AccountMenu from "@/app/components/AccountMenu";
+import { useHydrated } from "@/app/components/useHydrated";
 import { useSubjects } from "@/app/components/useSubjects";
 import { GRADES, STREAMS, hasPlayground, needsStream, secondsPerQuestion, streamLabel, subjectsForStudent, type Stream } from "@/lib/subjects";
 import TopStudents, { AwardBanner } from "./TopStudents";
+import Compete from "./Compete";
 import { Badges, Leaderboard, LevelCard, WeekActivity, type Badge, type Level } from "./Engagement";
 import { plainSummary } from "@/lib/highlight";
 
@@ -18,6 +20,7 @@ type Summary = {
   activity: { date: string; count: number; correct: number }[];
   badges: Badge[];
   recommendation: { subject: string; reason: string } | null;
+  coins: { balance: number; earned: number }; newBadges: string[]; badgeCoins: number;
   subjects: { subject: string; total: number; correct: number }[];
   recent: { prompt: string; subject: string; correct: boolean; timedOut?: boolean; createdAt: string }[];
 };
@@ -43,6 +46,9 @@ async function fetchSummary(): Promise<Summary | null> {
 export default function StudentDashboard() {
   const subjectList = useSubjects();
   const [data, setData] = useState<Summary | null>(null);
+  const [coinBalance, setCoinBalance] = useState<number | null>(null);
+  const [badgeNote, setBadgeNote] = useState(true);
+  const coins = coinBalance ?? data?.coins?.balance ?? 0;
   const [editing, setEditing] = useState(false);
   const grade = data?.user.grade ?? null;
   const stream = data?.user.stream ?? null;
@@ -62,7 +68,9 @@ export default function StudentDashboard() {
     { label: "Badges earned", value: data ? `${earned}/${data.badges.length}` : "–", icon: CheckCircle2, tint: "bg-green-50 text-green-600" },
   ];
   const codeSubjects = grade ? subjectsForStudent(grade, stream, subjectList).filter(hasPlayground).map((s) => s.name) : [];
-  const tip = TIPS[new Date().getDate() % TIPS.length];
+  const hydrated = useHydrated();
+  // Tip of the day: chosen in the browser so the pre-built page never disagrees with today.
+  const tip = hydrated ? TIPS[new Date().getDate() % TIPS.length] : TIPS[0];
   const examLink = (subject: string) => `/exam?grade=${encodeURIComponent(grade ?? "Grade 12")}&subject=${encodeURIComponent(subject)}`;
 
   return (
@@ -95,6 +103,19 @@ export default function StudentDashboard() {
         </section>
 
         <AwardBanner />
+
+        {/* Newly unlocked badges pay coins */}
+        <AnimatePresence>
+          {badgeNote && !!data?.newBadges?.length && (
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm">
+              <span className="text-2xl">🏅</span>
+              <p className="flex-1"><b>New badge{data.newBadges.length > 1 ? "s" : ""}: {data.newBadges.join(", ")}</b> — +{data.newBadges.length * data.badgeCoins} coins added to your wallet.</p>
+              <button type="button" onClick={() => setBadgeNote(false)} aria-label="Dismiss" className="rounded-lg px-2 py-1 font-bold text-amber-800 hover:bg-amber-100">✕</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {data?.user.grade && <Compete coins={coins} onCoins={setCoinBalance} />}
 
         {/* Recommended next step */}
         {data?.recommendation && grade && (

@@ -2,7 +2,8 @@ import { ObjectId } from "mongodb";
 import { apiError, readJson } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { xpFor } from "@/lib/gamification";
+import { COINS, grant } from "@/lib/coins";
+import { DAILY_GOAL, xpFor } from "@/lib/gamification";
 
 /** Records one answer. `selectedAnswer: -1` with `timedOut: true` means the timer ran out. */
 export async function POST(request: Request) {
@@ -26,7 +27,19 @@ export async function POST(request: Request) {
       for (const a of last) { if (!a.correct) break; combo++; }
     }
     const xp = xpFor(correct, timedOut, combo);
-    await db.collection("attempts").insertOne({ userId: new ObjectId(auth.user.id), questionId: question._id, selectedAnswer: selected, correct, timedOut, xp, createdAt: new Date() });
-    return Response.json({ correct, timedOut, xp, combo });
+    const inserted = await db.collection("attempts").insertOne({ userId: new ObjectId(auth.user.id), questionId: question._id, selectedAnswer: selected, correct, timedOut, xp, createdAt: new Date() });
+
+    // Coins (each reward is paid at most once).
+    let coins = 0;
+    if (correct) {
+      coins += await grant(auth.user.id, COINS.correct, "correct", inserted.insertedId.toString());
+      if (combo > 0 && combo % COINS.comboEvery === 0) coins += await grant(auth.user.id, COINS.comboBonus, "combo", inserted.insertedId.toString());
+    }
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
+    const todayStart = new Date(`${today}T00:00:00+03:00`);
+    if ((await db.collection("attempts").countDocuments({ userId: new ObjectId(auth.user.id), createdAt: { $gte: todayStart } })) >= DAILY_GOAL) {
+      coins += await grant(auth.user.id, COINS.dailyGoal, "daily-goal", today);
+    }
+    return Response.json({ correct, timedOut, xp, combo, coins });
   } catch (error) { return apiError(error); }
 }

@@ -1,5 +1,7 @@
 "use client";
 import { Check, Plus, Trash2, X } from "lucide-react";
+import RichText from "@/app/components/RichText";
+import { hasMath } from "@/lib/math";
 
 /**
  * One answer choice. Grows to fit multi-line text so a choice can hold a ``` code block;
@@ -7,10 +9,15 @@ import { Check, Plus, Trash2, X } from "lucide-react";
  */
 export function ChoiceInput({ value, onChange, placeholder, label, required, className = "" }: { value: string; onChange: (v: string) => void; placeholder: string; label: string; required?: boolean; className?: string }) {
   const code = /```|`/.test(value);
+  const math = hasMath(value);
   return (
-    <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} required={required} spellCheck={!code}
+    <span className="flex min-w-0 flex-1 flex-col">
+    <textarea data-math="" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} required={required} spellCheck={!code}
       rows={Math.min(12, value.split("\n").length)}
       className={`min-w-0 flex-1 resize-none bg-transparent outline-none ${code ? "font-mono text-[13px] leading-6" : ""} ${className}`} />
+    {/* Live preview of maths in the choice */}
+    {math && <span className="mt-0.5 border-t border-dashed border-slate-200 pt-1 text-sm text-navy"><RichText text={value} compact /></span>}
+    </span>
   );
 }
 

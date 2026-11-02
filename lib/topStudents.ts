@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { after } from "next/server";
 import { getDb } from "@/lib/db";
+import { COINS, grant } from "@/lib/coins";
 import { notifyAddress, notifyTopStudentsSummary, notifyWeeklyTop } from "@/lib/mail";
 
 /**
@@ -153,6 +154,8 @@ export async function ensureWeeklyAward(trigger: string): Promise<Award | null> 
       createdAt: new Date(), readAt: null,
     })));
   }
+  // Coin prizes for the top 3 (paid once per week).
+  for (const w of winnersRanked) await grant(w.userId, COINS.weekly[w.rank ?? 0] ?? 0, "weekly-top", key);
   if (criteria.emailWinners && winnersRanked.length) {
     const runEmails = async () => {
       await Promise.all(winnersRanked.map((w) => notifyWeeklyTop(w, label, criteria.scope === "grade")));

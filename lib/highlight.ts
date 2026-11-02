@@ -1,3 +1,4 @@
+import { mathToPlain } from "@/lib/math";
 /**
  * Small syntax highlighter for code in questions. Splits code into tokens with a kind
  * (keyword, string, comment, number, tag …) that the UI colours. Covers the languages
@@ -140,4 +141,4 @@ export function segments(text: string): Segment[] {
 
 /** Plain one-line summary of text that may contain code (for lists and previews). */
 export const plainSummary = (text: string) =>
-  text.replace(/```[\w+#.-]*\n?([\s\S]*?)(?:```|$)/g, (_, code: string) => ` ${code.trim().split("\n")[0]} … `).replace(/`([^`]+)`/g, "$1").replace(/\s+/g, " ").trim();
+  mathToPlain(text).replace(/```[\w+#.-]*\n?([\s\S]*?)(?:```|$)/g, (_, code: string) => ` ${code.trim().split("\n")[0]} … `).replace(/`([^`]+)`/g, "$1").replace(/\s+/g, " ").trim();

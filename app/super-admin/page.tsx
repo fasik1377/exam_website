@@ -12,6 +12,7 @@ import AccountMenu from "@/app/components/AccountMenu";
 import { useSession } from "@/app/components/useSession";
 import { streamLabel } from "@/lib/subjects";
 import { useSubjects } from "@/app/components/useSubjects";
+import { useHydrated } from "@/app/components/useHydrated";
 import PaymentsSection from "./PaymentsSection";
 import TopStudentsSection from "./TopStudentsSection";
 import SubjectsSection from "./SubjectsSection";
@@ -81,6 +82,7 @@ export default function SuperAdminPage() {
 const SECTIONS: Section[] = ["overview", "approvals", "users", "subjects", "top", "payments", "staff"];
 
 function SuperAdmin() {
+  const hydrated = useHydrated();
   const { user } = useSession();
   const tab = useSearchParams().get("tab") as Section | null;
   const [section, setSection] = useState<Section>(tab && SECTIONS.includes(tab) ? tab : "overview");
@@ -188,7 +190,7 @@ function SuperAdmin() {
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {section !== "overview" && <button onClick={() => setSection("overview")} className="-ml-2 inline-flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm font-bold text-slate-600 hover:bg-white hover:text-navy"><ArrowLeft size={16} /> Overview</button>}
-            <p className={`text-sm font-semibold text-slate-500 ${section !== "overview" ? "hidden sm:block" : ""}`}>{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+            <p className={`text-sm font-semibold text-slate-500 ${section !== "overview" ? "hidden sm:block" : ""}`}>{hydrated && new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
             <button onClick={reload} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-bold shadow-sm hover:border-royal">
               <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} /> Refresh
             </button>
@@ -256,6 +258,7 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo,
   name?: string; users: Account[]; overview: Overview | null; pending: Account[]; busy: string[];
   onDecide: (ids: string[], status: Status, verb: string) => void; goTo: (s: Section) => void; updatedAt: Date | null;
 }) {
+  const hydrated = useHydrated();
   const SUBJECTS = useSubjects();
   const [metric, setMetric] = useState<Metric>("signups");
   const count = (fn: (u: Account) => boolean) => users.filter(fn).length;
@@ -291,7 +294,7 @@ function OverviewSection({ name, users, overview, pending, busy, onDecide, goTo,
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" /></span>
               Live overview{updatedAt && <span className="font-semibold normal-case tracking-normal text-white/60">· updated {updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
             </p>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{greeting()}{name ? `, ${name}` : ""} 👋</h1>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">{hydrated ? greeting() : "Welcome"}{name ? `, ${name}` : ""} 👋</h1>
             <p className="mt-3 leading-7 text-white/75">
               {pending.length
                 ? <>You have <span className="font-extrabold text-gold">{pending.length} {pending.length === 1 ? "registration" : "registrations"}</span> waiting for approval.</>

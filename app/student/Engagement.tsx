@@ -1,14 +1,15 @@
 "use client";
 import { motion } from "framer-motion";
-import { Award, Crown, Flame, Lock, Medal, Sparkles, Star, Target, Trophy, Zap, type LucideIcon } from "lucide-react";
+import { Award, Coins, Crown, Flame, Gift, Lock, Medal, ShoppingBag, Sparkles, Star, Swords, Target, Trophy, Zap, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { Avatar } from "./Compete";
 import { useEffect, useState } from "react";
 
 export type Level = { level: number; title: string; xp: number; floor: number; next: number | null; progress: number };
 export type Badge = { id: string; name: string; detail: string; earned: boolean; have: number; need: number };
-type Board = { scope: string; players: number; top: { rank: number; name: string; xp: number; answers: number; me: boolean }[]; me: { rank: number; xp: number } | null };
+type Board = { scope: string; players: number; top: { rank: number; name: string; xp: number; answers: number; me: boolean; frame?: string | null; title?: string | null }[]; me: { rank: number; xp: number } | null };
 
-const BADGE_ICON: Record<string, LucideIcon> = { first: Star, "ten-correct": Sparkles, fifty: Medal, hundred: Crown, run5: Zap, streak3: Flame, streak7: Flame, explorer: Target, accurate: Trophy, goal: Award };
+const BADGE_ICON: Record<string, LucideIcon> = { first: Star, "ten-correct": Sparkles, fifty: Medal, hundred: Crown, run5: Zap, streak3: Flame, streak7: Flame, explorer: Target, accurate: Trophy, goal: Award, challenger: Swords, champion: Crown, "quest-master": Gift, collector: Coins, shopper: ShoppingBag };
 const dayName = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short" });
 
 /** Level, XP bar and today's goal ring — the top of the student dashboard. */
@@ -120,7 +121,8 @@ export function Leaderboard() {
           {board.top.map((r) => (
             <li key={r.rank} className={`flex items-center gap-3 rounded-xl px-3 py-2 ${r.me ? "bg-royal/10 ring-1 ring-royal/30" : "bg-slate-50"}`}>
               <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold ${medal[r.rank - 1] ?? "bg-white text-slate-500"}`}>{r.rank}</span>
-              <span className="flex-1 truncate text-sm font-bold">{r.name}{r.me && <span className="ml-1.5 text-xs text-royal">(you)</span>}</span>
+              <Avatar name={r.name} frame={r.frame} size="h-7 w-7 text-xs" />
+              <span className="flex-1 truncate text-sm font-bold">{r.name}{r.title && <span className="ml-1.5 rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">{r.title}</span>}{r.me && <span className="ml-1.5 text-xs text-royal">(you)</span>}</span>
               <span className="text-sm font-extrabold tabular-nums">{r.xp.toLocaleString()} <span className="text-xs font-semibold text-slate-400">XP</span></span>
             </li>
           ))}

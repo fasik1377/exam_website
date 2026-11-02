@@ -36,7 +36,7 @@ export function levelFor(xp: number) {
   };
 }
 
-export type BadgeStats = { total: number; correct: number; streak: number; bestRun: number; subjects: number; goalDays: number };
+export type BadgeStats = { total: number; correct: number; streak: number; bestRun: number; subjects: number; goalDays: number; coinsEarned: number; challenges: number; challengeWins: number; quests: number; purchases: number };
 export const BADGES: { id: string; name: string; detail: string; earned: (s: BadgeStats) => boolean; progress: (s: BadgeStats) => [number, number] }[] = [
   { id: "first", name: "First step", detail: "Answer your first question", earned: (s) => s.total >= 1, progress: (s) => [s.total, 1] },
   { id: "ten-correct", name: "Sharp mind", detail: "Get 10 answers right", earned: (s) => s.correct >= 10, progress: (s) => [s.correct, 10] },
@@ -48,6 +48,11 @@ export const BADGES: { id: string; name: string; detail: string; earned: (s: Bad
   { id: "explorer", name: "All-rounder", detail: "Practise 3 different subjects", earned: (s) => s.subjects >= 3, progress: (s) => [s.subjects, 3] },
   { id: "accurate", name: "Sharpshooter", detail: "80% accuracy after 20+ answers", earned: (s) => s.total >= 20 && s.correct / s.total >= 0.8, progress: (s) => [Math.min(s.total, 20), 20] },
   { id: "goal", name: "Goal getter", detail: `Hit the daily goal (${DAILY_GOAL} answers)`, earned: (s) => s.goalDays >= 1, progress: (s) => [s.goalDays, 1] },
+  { id: "challenger", name: "Challenger", detail: "Finish 5 daily challenges", earned: (s) => s.challenges >= 5, progress: (s) => [s.challenges, 5] },
+  { id: "champion", name: "Daily champion", detail: "Come first in a daily challenge", earned: (s) => s.challengeWins >= 1, progress: (s) => [s.challengeWins, 1] },
+  { id: "quest-master", name: "Quest master", detail: "Complete 5 weekly quests", earned: (s) => s.quests >= 5, progress: (s) => [s.quests, 5] },
+  { id: "collector", name: "Coin collector", detail: "Earn 200 coins", earned: (s) => s.coinsEarned >= 200, progress: (s) => [s.coinsEarned, 200] },
+  { id: "shopper", name: "Treat yourself", detail: "Buy something in the shop", earned: (s) => s.purchases >= 1, progress: (s) => [s.purchases, 1] },
 ];
 
 /** Longest run of correct answers in a chronological list. */

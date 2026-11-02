@@ -90,10 +90,15 @@ export function parseQuestions(raw: string): { questions: ParsedQuestion[]; warn
   const stashed = raw.replace(/\r\n?/g, "\n").replace(FENCE, (_, lang: string, code: string) => {
     blocks.push("```" + lang + "\n" + code.replace(/\s+$/, "") + "\n```");
     return `\n⟦CODE${blocks.length - 1}⟧\n`;
-  });
+  })
+    // Multi-line $$ … $$ maths is kept whole too (its lines are not questions or choices).
+    .replace(/\$\$[^$]*\n[^$]*\$\$/g, (math) => {
+      blocks.push(math.replace(/\s*\n\s*/g, " "));
+      return ` ⟦CODE${blocks.length - 1}⟧ `;
+    });
   const result = parseText(stashed);
   if (!blocks.length) return result;
-  const restore = (text: string) => text.replace(/\s*⟦CODE(\d+)⟧\s*/g, (_, i: string) => `\n${blocks[Number(i)]}\n`).trim();
+  const restore = (text: string) => text.replace(/\s*⟦CODE(\d+)⟧\s*/g, (_, i: string) => (blocks[Number(i)].startsWith("$$") ? ` ${blocks[Number(i)]} ` : `\n${blocks[Number(i)]}\n`)).trim();
   for (const q of result.questions) {
     q.prompt = restore(q.prompt);
     q.explanation = restore(q.explanation);

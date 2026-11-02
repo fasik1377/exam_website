@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Ethiopic, Plus_Jakarta_Sans } from "next/font/google";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./theme-dark.css";
 import { THEME_SCRIPT } from "@/lib/theme";

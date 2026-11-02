@@ -19,7 +19,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 type Question = { id: string; type?: "mcq" | "truefalse"; question: string; choices: string[]; answer: number; explanation: string; teacher: string; unit: string; year: string };
 type SessionUser = { name: string; role: string; plan: "free" | "monthly" | "yearly" | "teacher" };
 /** One answered (or timed-out) question in this sitting. */
-type Result = { choice: number; correct: boolean; timedOut: boolean; xp: number; combo: number };
+type Result = { choice: number; correct: boolean; timedOut: boolean; xp: number; combo: number; coins?: number };
 
 /** practice: see the right answer after every question. exam: answers and explanations only at the end. */
 type Mode = "practice" | "exam";
@@ -65,6 +65,11 @@ function Exam() {
   const [now, setNow] = useState(0);
   const [finished, setFinished] = useState(false);
   const [showSubscribe, setShowSubscribe] = useState(false);
+  // Power-ups (practice mode): how many the student owns, and which choices 50/50 removed per question.
+  const [powerups, setPowerups] = useState<Record<string, number> | null>(null);
+  const [removed, setRemoved] = useState<Record<number, number[]>>({});
+  const [boosted, setBoosted] = useState<Record<number, boolean>>({});
+  const [usingPower, setUsingPower] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode | null>(null);
   const reveal = mode === "practice";
   const question = questions[index];
@@ -85,6 +90,32 @@ function Exam() {
       .finally(() => setLoading(false));
   }, [grade, subject]);
 
+  useEffect(() => {
+    if (!saves) return;
+    let on = true;
+    fetch("/api/shop", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => on && d && setPowerups(d.gear?.powerups ?? {})).catch(() => {});
+    return () => { on = false; };
+  }, [saves]);
+
+  /** Spends one power-up on the server, then applies it to the current question. */
+  async function applyPowerup(id: "fifty" | "time") {
+    if (!question || result || usingPower) return;
+    setUsingPower(id);
+    const r = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "use", item: id }) }).catch(() => null);
+    const data = await r?.json().catch(() => ({}));
+    setUsingPower(null);
+    if (!r?.ok) return;
+    setPowerups(data.gear?.powerups ?? {});
+    if (id === "fifty") {
+      const wrong = question.choices.map((_, i) => i).filter((i) => i !== question.answer);
+      const keep = wrong[(index * 7 + question.choices.length) % wrong.length]; // which wrong answer stays (varies per question)
+      setRemoved((m) => ({ ...m, [index]: wrong.filter((i) => i !== keep).slice(0, Math.max(0, question.choices.length - 2)) }));
+    } else {
+      setBoosted((m) => ({ ...m, [index]: true }));
+      setStartedAt((t) => t + 30000);
+    }
+  }
+
   /** Saves an answer (or a timeout) and records the XP it earned. */
   const record = useCallback(async (at: number, q: Question, choice: number, timedOut: boolean, run: number) => {
     const correct = !timedOut && choice === q.answer;
@@ -93,7 +124,7 @@ function Exam() {
     if (!saves) return;
     const response = await fetch("/api/attempts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(timedOut ? { questionId: q.id, timedOut: true } : { questionId: q.id, selectedAnswer: choice }) }).catch(() => null);
     const data = await response?.json().catch(() => null);
-    if (response?.ok && typeof data?.xp === "number") setResults((r) => ({ ...r, [at]: { ...local, xp: data.xp, combo: correct ? data.combo : 0 } }));
+    if (response?.ok && typeof data?.xp === "number") setResults((r) => ({ ...r, [at]: { ...local, xp: data.xp, combo: correct ? data.combo : 0, coins: data.coins ?? 0 } }));
   }, [saves]);
 
   // Countdown for the current question. When it reaches zero the question locks and counts as unanswered.
@@ -129,6 +160,8 @@ function Exam() {
   }
   function restart() {
     setResults({});
+    setRemoved({});
+    setBoosted({});
     setFinished(false);
     setIndex(0);
     setMode(null); // choose the mode again
@@ -198,6 +231,23 @@ function Exam() {
           )}
         </div>
 
+        {reveal && saves && !locked && question && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {([["fifty", "✂️", "50 / 50"], ["time", "⏱️", "+30 sec"]] as const).map(([id, icon, label]) => {
+              const count = powerups?.[id] ?? 0;
+              const used = id === "fifty" ? Boolean(removed[index]) : Boolean(boosted[index]);
+              const disabled = !count || used || Boolean(result) || usingPower !== null || (id === "fifty" && question.type === "truefalse");
+              return (
+                <button key={id} type="button" disabled={disabled} onClick={() => applyPowerup(id)} title={count ? `Use one (${count} left)` : "Buy power-ups in the shop on your dashboard"}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${used ? "border-green-300 bg-green-50 text-green-700" : "border-slate-200 bg-white hover:border-royal disabled:opacity-40"}`}>
+                  <span>{icon}</span>{label}<span className="rounded-full bg-slate-100 px-1.5 text-[10px] text-slate-600">×{count}</span>
+                </button>
+              );
+            })}
+            <span className="text-[11px] text-slate-400">Power-ups · get more in the shop</span>
+          </div>
+        )}
+
         {locked ? <div className="mt-10 rounded-2xl border border-slate-200 bg-[#f7f9fc] p-8 text-center"><Lock className="mx-auto" /><h2 className="mt-4 text-xl font-bold">{access.freeQuestions ? "Free preview complete" : "Subscription required"}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{access.freeQuestions ? `You've used the ${access.freeQuestions} free questions in ${subject}. ` : ""}Subscribe to unlock all {total} questions, every explanation and teacher support.</p><div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row"><button onClick={() => setShowSubscribe(true)} className="rounded-lg bg-navy px-4 py-3 text-sm font-bold text-white">Subscribe monthly or yearly</button>{answered > 0 && <button onClick={() => setFinished(true)} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">See my results</button>}{!user && <Link href="/signup" className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-bold">Create student account</Link>}</div></div> : <>
           <AnimatePresence mode="wait"><motion.div key={question.id} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }}>
             {(question.year || question.unit) && (
@@ -209,6 +259,7 @@ function Exam() {
             {question.type === "truefalse" && <p className="mt-8 inline-flex rounded-full bg-gold/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-800">True or false?</p>}
             <div className={`${question.type === "truefalse" ? "mt-3" : "mt-8"} text-xl font-bold leading-8`}><RichText text={question.question} /></div>
             <div className={`mt-6 grid gap-3 ${question.type === "truefalse" ? "grid-cols-2" : ""}`}>{question.choices.map((choice, i) => {
+              if (removed[index]?.includes(i) && selected === null) return <div key={`${choice}-${i}`} className="rounded-xl border-2 border-dashed border-slate-200 p-4 text-sm text-slate-300 line-through">{String.fromCharCode(65 + i)}. removed by 50/50</div>;
               const isAnswer = i === question.answer;
               const state = selected === null ? "idle" : !reveal ? (selected === i ? "chosen" : "dim") : isAnswer ? "right" : selected === i ? "wrong" : "dim";
               const style = { idle: "border-slate-200 hover:-translate-y-0.5 hover:border-royal hover:bg-blue-50/50", chosen: "border-navy bg-navy/5 text-navy", right: "border-green-400 bg-green-50 text-green-800", wrong: "border-red-300 bg-red-50 text-red-700", dim: "border-slate-200 opacity-60" }[state];
@@ -226,6 +277,7 @@ function Exam() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-bold">{result.correct ? "Correct — well done! 🎉" : result.timedOut ? "⏰ Time is up — this one counts as unanswered." : "Not quite. Review the explanation."}</p>
               <span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${result.xp ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500"}`}>+{result.xp} XP</span>
+              {!!result.coins && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-700">+{result.coins} 🪙</span>}
             </div>
             {!result.correct && <div className="mt-1 text-sm text-slate-600">Correct answer: <b><AnswerText q={question} i={question.answer} /></b></div>}
             <div className="mt-2 text-sm leading-6 text-slate-600">{requiresSubscription ? "Subscribe to view the full teacher explanation." : question.explanation ? <RichText text={question.explanation} /> : "No explanation was provided for this question."}</div>
@@ -292,6 +344,7 @@ function XpPop({ result }: { result?: Result }) {
       {result && result.xp > 0 && (
         <motion.div initial={{ opacity: 0, y: 10, scale: 0.8 }} animate={{ opacity: [0, 1, 1, 0], y: -40, scale: 1 }} transition={{ duration: 1.6 }} className="pointer-events-none absolute right-8 top-60 text-right">
           <p className="text-2xl font-extrabold text-violet-600">+{result.xp} XP</p>
+          {!!result.coins && <p className="text-lg font-extrabold text-amber-500">+{result.coins} 🪙</p>}
           {result.combo >= 3 && result.combo % 3 === 0 && <p className="text-sm font-extrabold text-orange-500">🔥 {result.combo} in a row — bonus!</p>}
         </motion.div>
       )}

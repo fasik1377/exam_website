@@ -5,6 +5,8 @@ import { totalUnread } from "@/lib/chat";
 import { getDb } from "@/lib/db";
 import { BADGES, DAILY_GOAL, XP_EXPR, bestRun, levelFor } from "@/lib/gamification";
 import { getSubjects } from "@/lib/subjectStore";
+import { challengeStats } from "@/lib/challenge";
+import { COINS, grant, wallet } from "@/lib/coins";
 import { subjectsForStudent } from "@/lib/subjects";
 
 const TZ = "Africa/Addis_Ababa";
@@ -69,11 +71,23 @@ export async function GET() {
     const total = totals[0]?.total ?? 0;
     const correct = totals[0]?.correct ?? 0;
     const subjects = bySubject.map((s) => ({ subject: s._id, total: s.total, correct: s.correct }));
-    const stats = { total, correct, streak, bestRun: bestRun(history.map((h) => Boolean(h.correct)).reverse()), subjects: subjects.length, goalDays: days.filter((d) => d.count >= DAILY_GOAL).length };
+    const [coinWallet, challengeInfo, quests, purchases] = await Promise.all([
+      wallet(auth.user.id), challengeStats(auth.user.id),
+      db.collection("coin_ledger").countDocuments({ userId: me, reason: "quest" }),
+      db.collection("coin_ledger").countDocuments({ userId: me, reason: "shop" }),
+    ]);
+    const stats = {
+      total, correct, streak, bestRun: bestRun(history.map((h) => Boolean(h.correct)).reverse()), subjects: subjects.length, goalDays: days.filter((d) => d.count >= DAILY_GOAL).length,
+      coinsEarned: coinWallet.earned, challenges: challengeInfo.finished, challengeWins: challengeInfo.wins, quests, purchases,
+    };
     const badges = BADGES.map((b) => {
       const [have, need] = b.progress(stats);
       return { id: b.id, name: b.name, detail: b.detail, earned: b.earned(stats), have: Math.min(have, need), need };
     });
+    // Every badge pays coins once, the first time it is seen earned.
+    const newBadges: string[] = [];
+    for (const b of badges) if (b.earned && (await grant(auth.user.id, COINS.badge, "badge", b.id))) newBadges.push(b.name);
+    const coins = newBadges.length ? await wallet(auth.user.id) : coinWallet;
 
     // What to practise next: the weakest subject (3+ answers), else one not tried yet, else the least practised.
     const counts = new Map(available.map((a) => [a._id, a.count]));
@@ -97,7 +111,7 @@ export async function GET() {
       streak, unread,
       level: levelFor(totals[0]?.xp ?? 0),
       today, dailyGoal: DAILY_GOAL,
-      activity, badges, recommendation,
+      activity, badges, recommendation, coins, newBadges, badgeCoins: COINS.badge,
       subjects,
       recent: recent.map((r) => ({ prompt: r.q[0]?.prompt ?? "Removed question", subject: r.q[0]?.subject ?? "", correct: r.correct, timedOut: Boolean(r.timedOut), createdAt: r.createdAt })),
     });

@@ -1,6 +1,7 @@
 "use client";
 import { Code2, Eye, EyeOff, SquareCode } from "lucide-react";
 import { useRef, useState } from "react";
+import MathToolbar from "@/app/components/MathToolbar";
 import RichText from "@/app/components/RichText";
 import { LANGUAGES } from "@/lib/highlight";
 
@@ -54,6 +55,7 @@ export default function CodeTextarea({ value, onChange, rows = 3, placeholder, r
       <div className="flex flex-wrap items-center justify-between gap-2">
         {label && <span className="text-sm font-bold">{label}</span>}
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <MathToolbar />
           <select value={lang} onChange={(e) => { setLang(e.target.value); try { localStorage.setItem(LANG_KEY, e.target.value); } catch {} }} aria-label="Code language"
             className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold">
             {LANGUAGES.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
@@ -68,10 +70,10 @@ export default function CodeTextarea({ value, onChange, rows = 3, placeholder, r
           {value.trim() ? <RichText text={value} /> : <span className="text-slate-400">Nothing to preview yet.</span>}
         </div>
       ) : (
-        <textarea ref={ref} required={required} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} rows={hasCode ? Math.max(rows, Math.min(18, value.split("\n").length + 1)) : rows} placeholder={placeholder} spellCheck={!hasCode}
+        <textarea ref={ref} data-math="" required={required} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} rows={hasCode ? Math.max(rows, Math.min(18, value.split("\n").length + 1)) : rows} placeholder={placeholder} spellCheck={!hasCode}
           className={`mt-2 w-full rounded-xl border border-slate-200 p-3 font-normal ${hasCode ? "font-mono text-[13px] leading-6" : ""}`} />
       )}
-      <p className="mt-1 text-[11px] text-slate-400">Code: use <b>Code block</b> (keeps indentation; Tab indents inside it) or wrap short code in `backticks`.</p>
+      <p className="mt-1 text-[11px] text-slate-400">Maths: <b>∑ Math</b> or type LaTeX between $ signs, e.g. <code className="font-mono">{"$\\frac{1}{2}$"}</code> · Code: <b>Code block</b> or `backticks` · <b>Preview</b> shows what students see.</p>
     </div>
   );
 }

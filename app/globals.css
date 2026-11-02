@@ -182,3 +182,8 @@ html.theme-fade *::before,
 html.theme-fade *::after {
   transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease, fill 0.35s ease !important;
 }
+
+/* ---------- Maths (KaTeX) ---------- */
+.katex { font-size: 1.08em; }
+.math-display .katex-display { margin: 0.35em 0; }
+.math-display { scrollbar-width: thin; }

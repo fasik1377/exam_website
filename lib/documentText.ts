@@ -1,6 +1,7 @@
 import mammoth from "mammoth";
 import { extractText } from "unpdf";
 import WordExtractor from "word-extractor";
+import { convertDocxEquations, normalizeMathText } from "@/lib/omml";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -54,20 +55,24 @@ export async function documentText(fileName: string, bytes: ArrayBuffer): Promis
     // Legacy Word 97–2003 binary format.
     try {
       const doc = await new WordExtractor().extract(Buffer.from(bytes));
-      return { text: doc.getBody(), notes: ["Automatic numbering in old .doc files can't always be read — if questions are missing, number them by hand or save as .docx."] };
+      return { text: normalizeMathText(doc.getBody()), notes: ["Automatic numbering and equations in old .doc files can't always be read — if questions or formulas are missing, save the file as .docx (Word equations are converted from .docx)."] };
     } catch {
       throw new UnsupportedDocumentError("This .doc file could not be read. In Word choose File → Save As → Word Document (.docx), then upload again.");
     }
   }
   if (ext === "docx") {
-    const { value } = await mammoth.convertToHtml({ buffer: Buffer.from(bytes) });
-    if (value.includes("<img")) notes.push("Images or equation objects in the document were not imported — add them to the question text if needed.");
-    return { text: htmlToLines(value), notes };
+    // Word equations are turned into LaTeX first; otherwise they would be lost.
+    const { buffer, count } = await convertDocxEquations(Buffer.from(bytes));
+    const { value } = await mammoth.convertToHtml({ buffer });
+    if (count) notes.push(`${count} equation${count === 1 ? " was" : "s were"} converted to maths format — check them in the preview before publishing.`);
+    if (value.includes("<img")) notes.push("Images in the document were not imported — add them to the question text if needed.");
+    return { text: normalizeMathText(htmlToLines(value)), notes };
   }
   if (ext === "pdf") {
     const { text } = await extractText(new Uint8Array(bytes), { mergePages: true });
     if (!text.trim()) throw new UnsupportedDocumentError("This PDF has no selectable text (it may be a scanned image). Upload the original Word file or a text-based PDF.");
-    return { text, notes };
+    notes.push("PDFs don't keep equations as maths — fractions, powers and roots may come out flat (e.g. x2 for x²). Check each question in the preview, use the Math button to fix formulas, or upload the original Word file instead.");
+    return { text: normalizeMathText(text), notes };
   }
   if (ext === "txt") return { text: new TextDecoder().decode(bytes), notes };
   throw new UnsupportedDocumentError("Upload a .doc, .docx, .pdf or .txt file.");

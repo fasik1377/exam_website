@@ -17,6 +17,7 @@ const AREAS: { prefix: string; roles: UserRole[]; login: string }[] = [
   // Practising needs an account; teachers and the platform admin may preview.
   { prefix: "/exam", roles: ["student", "admin", "super-admin"], login: "/login" },
   { prefix: "/playground", roles: ["student", "admin", "super-admin"], login: "/login" },
+  { prefix: "/challenge", roles: ["student"], login: "/login" },
 ];
 
 export async function proxy(request: NextRequest) {
@@ -48,4 +49,4 @@ export async function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/admin/:path*", "/super-admin/:path*", "/student/:path*", "/chat/:path*", "/exam/:path*", "/playground/:path*"] };
+export const config = { matcher: ["/admin/:path*", "/super-admin/:path*", "/student/:path*", "/chat/:path*", "/exam/:path*", "/playground/:path*", "/challenge/:path*"] };

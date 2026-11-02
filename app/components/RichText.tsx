@@ -2,6 +2,7 @@
 import { Check, Copy, Play } from "lucide-react";
 import { Fragment, useState } from "react";
 import { highlight, languageLabel, normalizeLang, segments, type TokenKind } from "@/lib/highlight";
+import { renderMath, splitMath } from "@/lib/math";
 
 /** Asks the page's playground to open with this code; falls back to the playground page in a new tab. */
 function tryIt(lang: string, code: string) {
@@ -18,16 +19,25 @@ const COLOR: Record<TokenKind, string> = {
   fn: "text-[#82aaff]", tag: "text-[#f07178]", attr: "text-[#ffcb6b]", prop: "text-[#89ddff]", punct: "text-[#89ddff]",
 };
 
-/** Inline `code` inside normal text. */
+/** Typeset formula. KaTeX escapes its input and trust is off, so the HTML is safe to insert. */
+export function MathView({ tex, display }: { tex: string; display: boolean }) {
+  const html = renderMath(tex, display);
+  return display
+    ? <span className="math-display my-1 block overflow-x-auto overflow-y-hidden py-1" dangerouslySetInnerHTML={{ __html: html }} />
+    : <span className="math-inline" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/** Inline `code` and $maths$ inside normal text. */
 function InlineText({ text }: { text: string }) {
-  const parts = text.split(/(`[^`\n]+`)/g);
   return (
     <>
-      {parts.map((part, i) =>
-        part.startsWith("`") && part.endsWith("`") && part.length > 2
-          ? <code key={i} className="code-inline rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[0.9em] text-[#c7254e]">{part.slice(1, -1)}</code>
-          : <Fragment key={i}>{part}</Fragment>,
-      )}
+      {splitMath(text).map((m, j) => m.type === "math"
+        ? <MathView key={j} tex={m.tex} display={m.display} />
+        : m.text.split(/(`[^`\n]+`)/g).map((part, i) =>
+          part.startsWith("`") && part.endsWith("`") && part.length > 2
+            ? <code key={`${j}-${i}`} className="code-inline rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[0.9em] text-[#c7254e]">{part.slice(1, -1)}</code>
+            : <Fragment key={`${j}-${i}`}>{part}</Fragment>,
+        ))}
     </>
   );
 }
