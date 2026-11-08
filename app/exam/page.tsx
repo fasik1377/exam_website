@@ -12,14 +12,15 @@ import { hasCalculator, hasPlayground, secondsPerQuestion } from "@/lib/subjects
 import Playground, { projectFromSnippet } from "@/app/playground/Playground";
 import type { Project } from "@/app/playground/examples";
 import Calculator from "./Calculator";
+import NationalExam, { MAX_VIOLATIONS, type ExamReport, type ExamResult } from "./NationalExam";
 import RichText from "@/app/components/RichText";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
 type Question = { id: string; type?: "mcq" | "truefalse"; question: string; choices: string[]; answer: number; explanation: string; teacher: string; unit: string; year: string };
-type SessionUser = { name: string; role: string; plan: "free" | "monthly" | "yearly" | "teacher" };
+type SessionUser = { id: string; name: string; role: string; plan: "free" | "monthly" | "yearly" | "teacher" };
 /** One answered (or timed-out) question in this sitting. */
-type Result = { choice: number; correct: boolean; timedOut: boolean; xp: number; combo: number; coins?: number };
+type Result = ExamResult;
 
 /** practice: see the right answer after every question. exam: answers and explanations only at the end. */
 type Mode = "practice" | "exam";
@@ -71,6 +72,7 @@ function Exam() {
   const [boosted, setBoosted] = useState<Record<number, boolean>>({});
   const [usingPower, setUsingPower] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode | null>(null);
+  const [report, setReport] = useState<ExamReport | null>(null);
   const reveal = mode === "practice";
   const question = questions[index];
   const result = results[index];
@@ -129,7 +131,7 @@ function Exam() {
 
   // Countdown for the current question. When it reaches zero the question locks and counts as unanswered.
   useEffect(() => {
-    if (!mode || !startedAt || !question || locked || result || finished) return;
+    if (mode !== "practice" || !startedAt || !question || locked || result || finished) return;
     const deadline = startedAt + duration * 1000;
     const id = window.setInterval(() => {
       const t = Date.now();
@@ -160,6 +162,7 @@ function Exam() {
   }
   function restart() {
     setResults({});
+    setReport(null);
     setRemoved({});
     setBoosted({});
     setFinished(false);
@@ -170,7 +173,7 @@ function Exam() {
   // Keyboard: A–D / 1–4 to answer, Enter or → for the next question.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!mode || !question || finished || locked || showSubscribe || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (mode !== "practice" || !question || finished || locked || showSubscribe || e.metaKey || e.ctrlKey || e.altKey) return;
       // Typing in the calculator (or any field) must not answer the question.
       if (e.target instanceof HTMLElement && (e.target.closest("input, textarea, select") || e.target.closest("#calculator-panel"))) return;
       if (coding) return; // the code playground is open
@@ -203,14 +206,21 @@ function Exam() {
       </div>
     </header>
 
-    <div className={`mx-auto max-w-5xl px-5 py-8 ${calculator ? "pb-24" : ""}`}>
+    <div className={`mx-auto ${mode === "exam" && !finished ? "max-w-6xl" : "max-w-5xl"} px-5 py-8 ${calculator ? "pb-24" : ""}`}>
       {!mode && questions.length > 0 ? <ModePicker subject={subject} grade={grade} total={total} available={questions.length} seconds={duration} onStart={start} /> :
-      finished ? <Summary subject={subject} grade={grade} questions={questions} results={results} total={questions.length} saves={saves} mode={mode ?? "practice"} explanations={!requiresSubscription} onRestart={restart} onSubscribe={() => setShowSubscribe(true)} /> :
+      finished ? <Summary subject={subject} grade={grade} questions={questions} results={results} total={questions.length} saves={saves} mode={mode ?? "practice"} explanations={!requiresSubscription} report={report} onRestart={restart} onSubscribe={() => setShowSubscribe(true)} /> :
+      mode === "exam" ? (
+        <NationalExam questions={questions} subject={subject} grade={grade} candidate={user?.name ?? "Guest"} secondsPerQuestion={duration} saves={saves}
+          storageKey={`natexam:${user?.id ?? "guest"}:${grade}:${subject}`}
+          freeNote={access.limited && total > questions.length ? `This exam has the ${questions.length} free questions out of ${total}. Subscribe to sit the full ${subject} exam.` : undefined}
+          onCancel={() => setMode(null)}
+          onSubmit={(r, rep) => { setResults(r); setReport(rep); setFinished(true); }} />
+      ) :
       <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[.16em] text-royal">{grade} · {subject}</p>
-            <h1 className="mt-2 text-2xl font-bold">{mode === "exam" ? "Exam mode" : "Practice mode"}</h1>
+            <h1 className="mt-2 text-2xl font-bold">Practice mode</h1>
             <p className="mt-1 text-sm text-slate-500">Question <b className="text-navy">{Math.min(index + 1, total)}</b> of {total} · {duration >= 60 ? `${duration / 60} min` : `${duration} s`} per question</p>
             {reveal && combo >= 2 && <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-extrabold text-orange-600"><Flame size={13} />{combo} in a row!</p>}
           </div>
@@ -357,7 +367,7 @@ function ModePicker({ subject, grade, total, available, seconds, onStart }: { su
   const [last] = useState<Mode | null>(() => { try { const v = localStorage.getItem(MODE_KEY); return v === "exam" || v === "practice" ? v : null; } catch { return null; } });
   const options: { mode: Mode; icon: typeof Eye; title: string; text: string; points: string[] }[] = [
     { mode: "practice", icon: Eye, title: "Practice mode", text: "See if you're right straight after each question.", points: ["Correct answer shown after every question", "Explanation right away", "XP and streak bonuses as you go"] },
-    { mode: "exam", icon: GraduationCap, title: "Exam mode", text: "Work like the real national exam, then review everything.", points: ["No answers shown while you work", "Full results at the end", "Correct answers + explanations for every question"] },
+    { mode: "exam", icon: GraduationCap, title: "Exam mode", text: "A national exam simulation, then review everything.", points: ["One clock for the whole exam · move freely, flag, clear & change answers", "Answer sheet panel · stay on the page (leaving stops the exam)", "Full results, correct answers + explanations at the end"] },
   ];
   return (
     <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -387,8 +397,8 @@ function AnswerText({ q, i }: { q: Question; i: number }) {
 }
 
 /** End-of-session results, with a question-by-question review. */
-function Summary({ subject, grade, questions, results: byIndex, total, saves, mode, explanations, onRestart, onSubscribe }: {
-  subject: string; grade: string; questions: Question[]; results: Record<number, Result>; total: number; saves: boolean; mode: Mode; explanations: boolean; onRestart: () => void; onSubscribe: () => void;
+function Summary({ subject, grade, questions, results: byIndex, total, saves, mode, explanations, report, onRestart, onSubscribe }: {
+  subject: string; grade: string; questions: Question[]; results: Record<number, Result>; total: number; saves: boolean; mode: Mode; explanations: boolean; report: ExamReport | null; onRestart: () => void; onSubscribe: () => void;
 }) {
   const results = Object.values(byIndex);
   const [filter, setFilter] = useState<"all" | "wrong">(mode === "exam" ? "all" : "wrong");
@@ -419,13 +429,23 @@ function Summary({ subject, grade, questions, results: byIndex, total, saves, mo
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 p-6 sm:grid-cols-4">
-        {[
+        {(mode === "exam" && report ? [
+          { label: "XP earned", value: `+${xp}`, tint: "text-violet-600" },
+          { label: "Answered", value: `${results.length - report.unanswered}/${results.length}`, tint: "text-royal" },
+          { label: "Time used", value: `${Math.floor(report.timeUsed / 60)}:${String(report.timeUsed % 60).padStart(2, "0")}`, tint: "text-navy" },
+          { label: "Left the exam", value: `${report.violations}×`, tint: report.violations ? "text-red-600" : "text-green-600" },
+        ] : [
           { label: "XP earned", value: `+${xp}`, tint: "text-violet-600" },
           { label: "Best streak", value: `${best} 🔥`, tint: "text-orange-600" },
           { label: "Answered", value: `${results.length}/${total}`, tint: "text-royal" },
           { label: "Timed out", value: timeouts, tint: "text-amber-600" },
-        ].map((s) => <div key={s.label} className="rounded-2xl bg-slate-50 p-4 text-center"><p className={`text-2xl font-extrabold ${s.tint}`}>{s.value}</p><p className="text-xs font-semibold text-slate-500">{s.label}</p></div>)}
+        ]).map((s) => <div key={s.label} className="rounded-2xl bg-slate-50 p-4 text-center"><p className={`text-2xl font-extrabold ${s.tint}`}>{s.value}</p><p className="text-xs font-semibold text-slate-500">{s.label}</p></div>)}
       </div>
+      {report?.autoSubmitted && (
+        <p className="mx-6 mb-3 flex items-center gap-2 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+          {report.autoSubmitted === "time" ? "⏰ Time ran out — your exam was submitted automatically." : `🚫 Your exam was submitted automatically because you left the exam ${MAX_VIOLATIONS} times.`}
+        </p>
+      )}
       {!saves && <p className="mx-6 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Sign in with a student account to save your XP, streak and badges.</p>}
 
       {/* Review */}
@@ -449,7 +469,7 @@ function Summary({ subject, grade, questions, results: byIndex, total, saves, mo
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold"><RichText text={q.question} /></div>
                   <div className="mt-2 grid gap-1 text-sm">
-                    {r.timedOut ? <p className="flex items-center gap-1.5 font-semibold text-amber-700"><Clock3 size={15} /> Not answered — time ran out</p>
+                    {r.timedOut ? <p className="flex items-center gap-1.5 font-semibold text-amber-700"><Clock3 size={15} /> {r.skipped ? "Not answered" : "Not answered — time ran out"}</p>
                       : <div className={`flex items-start gap-1.5 font-semibold ${r.correct ? "text-green-700" : "text-red-600"}`}>{r.correct ? <CheckCircle2 size={15} className="mt-0.5 shrink-0" /> : <XCircle size={15} className="mt-0.5 shrink-0" />}Your answer: <AnswerText q={q} i={r.choice} /></div>}
                     {!r.correct && <div className="flex items-start gap-1.5 font-semibold text-green-700"><CheckCircle2 size={15} className="mt-0.5 shrink-0" />Correct answer: <AnswerText q={q} i={q.answer} /></div>}
                   </div>

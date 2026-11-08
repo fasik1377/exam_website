@@ -44,6 +44,29 @@ export async function grant(userId: string, amount: number, reason: string, ref:
   return amount;
 }
 
+/** Pays several rewards at once (one round trip each for the ledger and the wallet). Returns coins granted per ref. */
+export async function grantMany(userId: string, items: { amount: number; reason: string; ref: string }[]) {
+  const paid = new Map<string, number>();
+  const rows = items.filter((i) => i.amount > 0);
+  if (!rows.length) return paid;
+  const { wallets, ledger } = await col();
+  const uid = new ObjectId(userId);
+  const now = new Date();
+  let inserted: number[] = rows.map((_, i) => i);
+  try {
+    await ledger.insertMany(rows.map((r) => ({ userId: uid, amount: r.amount, reason: r.reason, ref: r.ref, createdAt: now })), { ordered: false });
+  } catch (error) {
+    // Rewards already paid before are skipped (duplicate key); the rest went in.
+    const failed = new Set(((error as { writeErrors?: { index: number; code?: number }[] }).writeErrors ?? []).filter((e) => e.code === 11000).map((e) => e.index));
+    if (!failed.size) throw error;
+    inserted = inserted.filter((i) => !failed.has(i));
+  }
+  const total = inserted.reduce((sum, i) => sum + rows[i].amount, 0);
+  if (total) await wallets.updateOne({ _id: uid }, { $inc: { balance: total, earned: total }, $set: { updatedAt: now } }, { upsert: true });
+  for (const i of inserted) paid.set(rows[i].ref + "|" + rows[i].reason, rows[i].amount);
+  return paid;
+}
+
 /** Takes coins if the balance allows it (atomic). Returns the new balance, or null if there aren't enough. */
 export async function spend(userId: string, amount: number, reason: string, ref: string) {
   const { wallets, ledger } = await col();
